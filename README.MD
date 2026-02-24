@@ -1,4 +1,4 @@
-# EduPulse (Go + SQLite) — minimal backend for university assignment
+# EduPulse (Go + SQLite) 
 
 A small but *real* REST API backend in Go for an educational center platform **EduPulse**.
 
@@ -11,4 +11,4 @@ Key features implemented (per assignment):
 - SQLite with SQL migration + auto-migration on startup
 - Modular layout: handlers/services/repos/middleware/events/db/auth
 
-## Project layout
+
