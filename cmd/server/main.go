@@ -1,0 +1,117 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"edupulse/internal/auth"
+	"edupulse/internal/db"
+	"edupulse/internal/events"
+	httpapi "edupulse/internal/http"
+	"edupulse/internal/repo"
+	"edupulse/internal/service"
+	"edupulse/internal/workers"
+)
+
+func main() {
+	addr := env("EDUPULSE_ADDR", ":8080")
+	dbPath := env("EDUPULSE_DB_PATH", "./edupulse.db")
+	jwtSecret := env("EDUPULSE_JWT_SECRET", "dev-secret-change-me")
+
+	database, err := db.OpenSQLite(dbPath)
+	if err != nil {
+		log.Fatalf("db open: %v", err)
+	}
+	defer database.Close()
+
+	if err := db.Migrate(database); err != nil {
+		log.Fatalf("db migrate: %v", err)
+	}
+	if err := db.Seed(database); err != nil {
+		log.Fatalf("db seed: %v", err)
+	}
+
+	// Repos
+	userRepo := repo.NewUserRepo(database)
+	branchRepo := repo.NewBranchRepo(database)
+	sessionRepo := repo.NewSessionRepo(database)
+	hwRepo := repo.NewHomeworkRepo(database)
+	auditRepo := repo.NewAuditRepo(database)
+	notifRepo := repo.NewNotificationRepo(database)
+	analyticsRepo := repo.NewAnalyticsRepo(database)
+
+	// Event bus + worker
+	bus := events.NewBus(256)
+
+	// Services (existing)
+	auditSvc := service.NewAuditService(auditRepo)
+	notifSvc := service.NewNotificationService(notifRepo)
+	analyticsSvc := service.NewAnalyticsService(analyticsRepo)
+	authSvc := auth.NewService(userRepo, jwtSecret)
+	branchSvc := service.NewBranchService(branchRepo, auditSvc)
+	sessionSvc := service.NewSessionService(sessionRepo, analyticsRepo, auditSvc, 9)
+	hwSvc := service.NewHomeworkService(hwRepo, auditSvc, bus)
+
+	// New read/manage services
+	userSvc := service.NewUserService(userRepo)
+	branchReadSvc := service.NewBranchReadService(branchRepo)
+	sessionReadSvc := service.NewSessionReadService(sessionRepo)
+	hwManageSvc := service.NewHomeworkManageService(hwRepo, auditSvc, bus)
+
+	consumer := workers.NewHomeworkConsumer(notifSvc, auditSvc)
+	bus.StartWorker(context.Background(), consumer)
+
+	api := httpapi.NewServer(httpapi.Deps{
+		JWTSecret:         jwtSecret,
+		AuthSvc:           authSvc,
+		UserSvc:           userSvc,
+		BranchSvc:         branchSvc,
+		BranchReadSvc:     branchReadSvc,
+		SessionSvc:        sessionSvc,
+		SessionReadSvc:    sessionReadSvc,
+		HomeworkSvc:       hwSvc,
+		HomeworkManageSvc: hwManageSvc,
+		AuditSvc:          auditSvc,
+		AnalyticsSvc:      analyticsSvc,
+		NotificationSvc:   notifSvc,
+	})
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           api.Router(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      20 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	go func() {
+		log.Printf("EduPulse backend listening on %s (db=%s)", addr, dbPath)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_ = srv.Shutdown(ctx)
+	bus.Stop()
+	log.Println("shutdown complete")
+}
+
+func env(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
