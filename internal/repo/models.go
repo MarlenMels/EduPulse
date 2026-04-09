@@ -15,7 +15,6 @@ type Branch struct {
 	Name      string    `json:"name"`
 	Lat       float64   `json:"lat"`
 	Lng       float64   `json:"lng"`
-	H3Index   string    `json:"h3_index"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -27,7 +26,6 @@ type Session struct {
 	StartTime time.Time `json:"start_time"`
 	Lat       float64   `json:"lat"`
 	Lng       float64   `json:"lng"`
-	H3Index   string    `json:"h3_index"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -56,10 +54,4 @@ type Notification struct {
 	PayloadJSON string    `json:"payload_json"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
-}
-
-type AnalyticsRow struct {
-	H3Index       string `json:"h3_index"`
-	Day           string `json:"day"`
-	SessionsCount int    `json:"sessions_count"`
 }

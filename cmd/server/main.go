@@ -43,21 +43,18 @@ func main() {
 	hwRepo := repo.NewHomeworkRepo(database)
 	auditRepo := repo.NewAuditRepo(database)
 	notifRepo := repo.NewNotificationRepo(database)
-	analyticsRepo := repo.NewAnalyticsRepo(database)
 
 	// Event bus + worker
 	bus := events.NewBus(256)
 
-	// Services (existing)
+	// Services
 	auditSvc := service.NewAuditService(auditRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
-	analyticsSvc := service.NewAnalyticsService(analyticsRepo)
 	authSvc := auth.NewService(userRepo, jwtSecret)
 	branchSvc := service.NewBranchService(branchRepo, auditSvc)
-	sessionSvc := service.NewSessionService(sessionRepo, analyticsRepo, auditSvc, 9)
+	sessionSvc := service.NewSessionService(sessionRepo, auditSvc)
 	hwSvc := service.NewHomeworkService(hwRepo, auditSvc, bus)
 
-	// New read/manage services
 	userSvc := service.NewUserService(userRepo)
 	branchReadSvc := service.NewBranchReadService(branchRepo)
 	sessionReadSvc := service.NewSessionReadService(sessionRepo)
@@ -77,7 +74,6 @@ func main() {
 		HomeworkSvc:       hwSvc,
 		HomeworkManageSvc: hwManageSvc,
 		AuditSvc:          auditSvc,
-		AnalyticsSvc:      analyticsSvc,
 		NotificationSvc:   notifSvc,
 	})
 

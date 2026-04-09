@@ -15,17 +15,16 @@ import (
 type Deps struct {
 	JWTSecret string
 
-	AuthSvc             *auth.Service
-	UserSvc             *service.UserService
-	BranchSvc           *service.BranchService
-	BranchReadSvc       *service.BranchReadService
-	SessionSvc          *service.SessionService
-	SessionReadSvc      *service.SessionReadService
-	HomeworkSvc         *service.HomeworkService
-	HomeworkManageSvc   *service.HomeworkManageService
-	AuditSvc            *service.AuditService
-	AnalyticsSvc        *service.AnalyticsService
-	NotificationSvc     *service.NotificationService
+	AuthSvc           *auth.Service
+	UserSvc           *service.UserService
+	BranchSvc         *service.BranchService
+	BranchReadSvc     *service.BranchReadService
+	SessionSvc        *service.SessionService
+	SessionReadSvc    *service.SessionReadService
+	HomeworkSvc       *service.HomeworkService
+	HomeworkManageSvc *service.HomeworkManageService
+	AuditSvc          *service.AuditService
+	NotificationSvc   *service.NotificationService
 }
 
 type Server struct {
@@ -49,6 +48,7 @@ func NewServer(d Deps) *Server {
 	// Public
 	authH := handlers.NewAuthHandler(d.AuthSvc)
 	r.Route("/auth", func(r chi.Router) {
+		r.Post("/register", authH.Register)
 		r.Post("/login", authH.Login)
 	})
 
@@ -58,13 +58,10 @@ func NewServer(d Deps) *Server {
 		r.Use(authMW)
 
 		userH := handlers.NewUserHandler(d.UserSvc)
-
 		branchH := handlers.NewBranchHandler(d.BranchSvc, d.BranchReadSvc)
 		sessionH := handlers.NewSessionHandler(d.SessionSvc, d.SessionReadSvc)
 		hwH := handlers.NewHomeworkHandler(d.HomeworkSvc, d.HomeworkManageSvc)
-
 		auditH := handlers.NewAuditHandler(d.AuditSvc)
-		analyticsH := handlers.NewAnalyticsHandler(d.AnalyticsSvc)
 		notifH := handlers.NewNotificationHandler(d.NotificationSvc)
 
 		// Profile
@@ -79,7 +76,6 @@ func NewServer(d Deps) *Server {
 		r.Post("/sessions", middleware.RBAC(auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(sessionH.Create)).ServeHTTP)
 		r.Get("/sessions", sessionH.List)
 		r.Get("/sessions/{id}", sessionH.Get)
-		r.Get("/sessions/nearby", sessionH.Nearby)
 
 		// Homework
 		r.Post("/homework/submit", middleware.RBAC(auth.RoleStudent)(http.HandlerFunc(hwH.Submit)).ServeHTTP)
@@ -87,9 +83,8 @@ func NewServer(d Deps) *Server {
 		r.Get("/homework/mine", middleware.RBAC(auth.RoleStudent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
 		r.Patch("/homework/{id}/status", middleware.RBAC(auth.RoleTeacher)(http.HandlerFunc(hwH.UpdateStatus)).ServeHTTP)
 
-		// Audit / analytics / notifications
+		// Audit / notifications
 		r.Get("/audit-logs", middleware.RBAC(auth.RoleAdmin)(http.HandlerFunc(auditH.List)).ServeHTTP)
-		r.Get("/analytics/sessions-by-h3", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(analyticsH.ListSessionsByH3)).ServeHTTP)
 		r.Get("/notifications", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(notifH.List)).ServeHTTP)
 	})
 

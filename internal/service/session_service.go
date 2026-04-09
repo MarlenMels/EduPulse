@@ -10,27 +10,17 @@ import (
 )
 
 type SessionService struct {
-	repo         *repo.SessionRepo
-	analytics    *repo.AnalyticsRepo
-	auditSvc     *AuditService
-	h3Resolution int
+	repo     *repo.SessionRepo
+	auditSvc *AuditService
 }
 
-func NewSessionService(r *repo.SessionRepo, analytics *repo.AnalyticsRepo, audit *AuditService, h3Resolution int) *SessionService {
-	if h3Resolution <= 0 {
-		h3Resolution = 9
-	}
-	return &SessionService{
-		repo:         r,
-		analytics:    analytics,
-		auditSvc:     audit,
-		h3Resolution: h3Resolution,
-	}
+func NewSessionService(r *repo.SessionRepo, audit *AuditService) *SessionService {
+	return &SessionService{repo: r, auditSvc: audit}
 }
 
 type CreateSessionInput struct {
 	BranchID  int64
-	TeacherID int64 // optional for manager; required for manager if not 0?
+	TeacherID int64
 	Title     string
 	StartTime time.Time
 	Lat       float64
@@ -54,13 +44,7 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 		teacherID = actorID
 	}
 	if teacherID <= 0 {
-		// allow manager to set teacher_id explicitly; default to manager as pseudo-teacher for demo
 		teacherID = actorID
-	}
-
-	h3idx, err := H3FromLatLng(in.Lat, in.Lng, s.h3Resolution)
-	if err != nil {
-		return repo.Session{}, err
 	}
 
 	sess := repo.Session{
@@ -70,26 +54,21 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 		StartTime: in.StartTime.UTC(),
 		Lat:       in.Lat,
 		Lng:       in.Lng,
-		H3Index:   h3idx,
 	}
 	created, err := s.repo.Create(ctx, sess)
 	if err != nil {
 		return repo.Session{}, err
 	}
 
-	day := created.StartTime.UTC().Format("2006-01-02")
-	_ = s.analytics.IncrementSessionsByH3Day(ctx, created.H3Index, day, 1)
-
 	_ = s.auditSvc.Log(ctx, actorID, "create_session", "session", created.ID, map[string]any{
 		"branch_id":  created.BranchID,
 		"teacher_id": created.TeacherID,
-		"h3":         created.H3Index,
 		"start_time": created.StartTime.UTC().Format(time.RFC3339),
 	})
 
 	return created, nil
 }
 
-func (s *SessionService) List(ctx context.Context, h3Index string, limit int) ([]repo.Session, error) {
-	return s.repo.List(ctx, h3Index, limit)
+func (s *SessionService) List(ctx context.Context, limit int) ([]repo.Session, error) {
+	return s.repo.List(ctx, limit)
 }

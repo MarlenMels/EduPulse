@@ -36,3 +36,29 @@ func (s *Service) Login(ctx context.Context, email, password string) (LoginResul
 	}
 	return LoginResult{Token: tok, Role: u.Role}, nil
 }
+
+func (s *Service) Register(ctx context.Context, email, password, role string) (LoginResult, error) {
+	existing, err := s.users.GetByEmail(ctx, email)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	if existing != nil {
+		return LoginResult{}, errors.New("email already registered")
+	}
+
+	hash, err := HashPassword(password)
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	u, err := s.users.Create(ctx, email, hash, role)
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	tok, err := NewToken(u.ID, u.Role, s.secret, 24*time.Hour)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	return LoginResult{Token: tok, Role: u.Role}, nil
+}

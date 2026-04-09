@@ -29,6 +29,6 @@ func (s *BranchReadService) Get(ctx context.Context, id int64) (*repo.Branch, er
 	return b, nil
 }
 
-func (s *BranchReadService) List(ctx context.Context, h3Index, q string, limit int) ([]repo.Branch, error) {
-	return s.branches.List(ctx, h3Index, q, limit)
+func (s *BranchReadService) List(ctx context.Context, q string, limit int) ([]repo.Branch, error) {
+	return s.branches.List(ctx, q, limit)
 }

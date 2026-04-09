@@ -39,3 +39,17 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*User, error) {
 	u.CreatedAt = t
 	return &u, nil
 }
+
+func (r *UserRepo) Create(ctx context.Context, email, passwordHash, role string) (User, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := r.db.ExecContext(ctx,
+		"INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+		email, passwordHash, role, now,
+	)
+	if err != nil {
+		return User{}, err
+	}
+	id, _ := res.LastInsertId()
+	t, _ := time.Parse(time.RFC3339, now)
+	return User{ID: id, Email: email, Role: role, CreatedAt: t}, nil
+}

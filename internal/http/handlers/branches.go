@@ -53,7 +53,6 @@ func (h *BranchHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BranchHandler) List(w http.ResponseWriter, r *http.Request) {
-	h3 := r.URL.Query().Get("h3")
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	limit := 50
@@ -63,7 +62,7 @@ func (h *BranchHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items, err := h.read.List(r.Context(), h3, q, limit)
+	items, err := h.read.List(r.Context(), q, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db error")
 		return

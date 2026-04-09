@@ -65,14 +65,13 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
-	h3 := r.URL.Query().Get("h3")
 	limit := 50
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			limit = n
 		}
 	}
-	sessions, err := h.write.List(r.Context(), h3, limit)
+	sessions, err := h.write.List(r.Context(), limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db error")
 		return
@@ -97,30 +96,4 @@ func (h *SessionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s)
-}
-
-func (h *SessionHandler) Nearby(w http.ResponseWriter, r *http.Request) {
-	center := r.URL.Query().Get("h3")
-	k := 1
-	if v := r.URL.Query().Get("k"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			k = n
-		}
-	}
-	limit := 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
-
-	items, err := h.read.NearbyByH3(r.Context(), center, k, limit)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"items": items,
-		"count": len(items),
-	})
 }

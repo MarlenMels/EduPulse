@@ -13,10 +13,8 @@ CREATE TABLE IF NOT EXISTS branches (
     name TEXT NOT NULL,
     lat REAL NOT NULL,
     lng REAL NOT NULL,
-    h3_index TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_branches_h3 ON branches(h3_index);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,12 +24,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     start_time TEXT NOT NULL,
     lat REAL NOT NULL,
     lng REAL NOT NULL,
-    h3_index TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY(teacher_id) REFERENCES users(id) ON DELETE RESTRICT
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_h3 ON sessions(h3_index);
 CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
 
 CREATE TABLE IF NOT EXISTS homework_submissions (
@@ -65,11 +61,3 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
-
-CREATE TABLE IF NOT EXISTS analytics_sessions_by_h3 (
-    h3_index TEXT NOT NULL,
-    day TEXT NOT NULL,
-    sessions_count INTEGER NOT NULL,
-    PRIMARY KEY (h3_index, day)
-);
-CREATE INDEX IF NOT EXISTS idx_analytics_day ON analytics_sessions_by_h3(day);
