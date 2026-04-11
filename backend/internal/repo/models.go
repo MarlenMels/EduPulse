@@ -55,3 +55,29 @@ type Notification struct {
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+type Course struct {
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	ImageURL    string    `json:"image_url"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Lesson struct {
+	ID        int64     `json:"id"`
+	CourseID  int64     `json:"course_id"`
+	Title     string    `json:"title"`
+	VideoURL  string    `json:"video_url"`
+	SortOrder int       `json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Review struct {
+	ID        int64     `json:"id"`
+	CourseID  int64     `json:"course_id"`
+	UserID    int64     `json:"user_id"`
+	Rating    int       `json:"rating"`
+	Comment   string    `json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
+}

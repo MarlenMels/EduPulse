@@ -43,6 +43,7 @@ func main() {
 	hwRepo := repo.NewHomeworkRepo(database)
 	auditRepo := repo.NewAuditRepo(database)
 	notifRepo := repo.NewNotificationRepo(database)
+	courseRepo := repo.NewCourseRepo(database)
 
 	// Event bus + worker
 	bus := events.NewBus(256)
@@ -59,6 +60,7 @@ func main() {
 	branchReadSvc := service.NewBranchReadService(branchRepo)
 	sessionReadSvc := service.NewSessionReadService(sessionRepo)
 	hwManageSvc := service.NewHomeworkManageService(hwRepo, auditSvc, bus)
+	courseSvc := service.NewCourseService(courseRepo)
 
 	consumer := workers.NewHomeworkConsumer(notifSvc, auditSvc)
 	bus.StartWorker(context.Background(), consumer)
@@ -75,6 +77,7 @@ func main() {
 		HomeworkManageSvc: hwManageSvc,
 		AuditSvc:          auditSvc,
 		NotificationSvc:   notifSvc,
+		CourseSvc:         courseSvc,
 	})
 
 	srv := &http.Server{
