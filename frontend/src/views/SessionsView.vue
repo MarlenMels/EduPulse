@@ -12,11 +12,8 @@ const showCreateModal = ref(false)
 const creating = ref(false)
 
 const newSession = ref({
-  branch_id: 1,
   title: '',
   start_time: '',
-  lat: 0,
-  lng: 0,
 })
 
 async function fetchSessions() {
@@ -37,11 +34,11 @@ async function createSession() {
   creating.value = true
   try {
     await sessionsApi.create({
-      ...newSession.value,
+      title: newSession.value.title,
       start_time: new Date(newSession.value.start_time).toISOString(),
     })
     showCreateModal.value = false
-    newSession.value = { branch_id: 1, title: '', start_time: '', lat: 0, lng: 0 }
+    newSession.value = { title: '', start_time: '' }
     await fetchSessions()
   } catch (e: any) {
     error.value = e.response?.data?.error || 'Failed to create'
@@ -69,7 +66,7 @@ onMounted(fetchSessions)
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <h1 class="text-2xl font-extrabold text-cyan-400">Sessions</h1>
       <button
-        v-if="auth.isManager || auth.isTeacher"
+        v-if="auth.isAdmin || auth.isManager || auth.isTeacher"
         @click="showCreateModal = true"
         class="flex items-center gap-2 px-4 py-2.5 bg-cyan-400 text-black font-semibold text-sm rounded-xl hover:bg-cyan-300 transition-colors"
       >
@@ -111,7 +108,7 @@ onMounted(fetchSessions)
                 <Clock class="w-3 h-3" />
                 {{ formatDate(session.start_time) }}
               </span>
-              <span>Branch: {{ session.branch_id }}</span>
+              <span>Teacher: {{ session.teacher_id || '—' }}</span>
             </div>
           </div>
           <span class="text-xs text-white/30 shrink-0">#{{ session.id }}</span>
@@ -141,30 +138,12 @@ onMounted(fetchSessions)
                 />
               </div>
               <div>
-                <label class="block text-sm font-semibold text-white/70 mb-1.5">Branch ID</label>
-                <input
-                  v-model.number="newSession.branch_id"
-                  type="number"
-                  class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
-                />
-              </div>
-              <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Date & Time</label>
                 <input
                   v-model="newSession.start_time"
                   type="datetime-local"
                   class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
                 />
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-sm font-semibold text-white/70 mb-1.5">Latitude</label>
-                  <input v-model.number="newSession.lat" type="number" step="any" class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none" />
-                </div>
-                <div>
-                  <label class="block text-sm font-semibold text-white/70 mb-1.5">Longitude</label>
-                  <input v-model.number="newSession.lng" type="number" step="any" class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none" />
-                </div>
               </div>
               <div class="flex gap-3 pt-2">
                 <button type="button" @click="showCreateModal = false" class="flex-1 py-3 rounded-xl text-white/60 font-semibold text-sm hover:bg-white/5 transition-colors">

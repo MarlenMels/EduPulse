@@ -13,8 +13,8 @@ func NewSessionRepo(db *sql.DB) *SessionRepo { return &SessionRepo{db: db} }
 func (r *SessionRepo) Create(ctx context.Context, s Session) (Session, error) {
 	created := time.Now().UTC().Format(time.RFC3339)
 	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO sessions (branch_id, teacher_id, title, start_time, lat, lng, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		s.BranchID, s.TeacherID, s.Title, s.StartTime.UTC().Format(time.RFC3339), s.Lat, s.Lng, created,
+		"INSERT INTO sessions (teacher_id, title, start_time, created_at) VALUES (?, ?, ?, ?)",
+		s.TeacherID, s.Title, s.StartTime.UTC().Format(time.RFC3339), created,
 	)
 	if err != nil {
 		return Session{}, err
@@ -30,7 +30,7 @@ func (r *SessionRepo) List(ctx context.Context, limit int) ([]Session, error) {
 		limit = 50
 	}
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, branch_id, teacher_id, title, start_time, lat, lng, created_at FROM sessions ORDER BY start_time DESC LIMIT ?",
+		"SELECT id, teacher_id, title, start_time, created_at FROM sessions ORDER BY start_time DESC LIMIT ?",
 		limit,
 	)
 	if err != nil {
@@ -42,7 +42,7 @@ func (r *SessionRepo) List(ctx context.Context, limit int) ([]Session, error) {
 	for rows.Next() {
 		var s Session
 		var start, created string
-		if err := rows.Scan(&s.ID, &s.BranchID, &s.TeacherID, &s.Title, &start, &s.Lat, &s.Lng, &created); err != nil {
+		if err := rows.Scan(&s.ID, &s.TeacherID, &s.Title, &start, &created); err != nil {
 			return nil, err
 		}
 		s.StartTime, _ = time.Parse(time.RFC3339, start)
@@ -54,12 +54,12 @@ func (r *SessionRepo) List(ctx context.Context, limit int) ([]Session, error) {
 
 func (r *SessionRepo) GetByID(ctx context.Context, id int64) (*Session, error) {
 	row := r.db.QueryRowContext(ctx,
-		"SELECT id, branch_id, teacher_id, title, start_time, lat, lng, created_at FROM sessions WHERE id = ?",
+		"SELECT id, teacher_id, title, start_time, created_at FROM sessions WHERE id = ?",
 		id,
 	)
 	var s Session
 	var start, created string
-	if err := row.Scan(&s.ID, &s.BranchID, &s.TeacherID, &s.Title, &start, &s.Lat, &s.Lng, &created); err != nil {
+	if err := row.Scan(&s.ID, &s.TeacherID, &s.Title, &start, &created); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}

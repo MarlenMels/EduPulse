@@ -21,14 +21,23 @@ func NewSessionHandler(write *service.SessionService, read *service.SessionReadS
 }
 
 type createSessionReq struct {
-	BranchID  int64   `json:"branch_id"`
-	TeacherID int64   `json:"teacher_id,omitempty"`
-	Title     string  `json:"title"`
-	StartTime string  `json:"start_time"`
-	Lat       float64 `json:"lat"`
-	Lng       float64 `json:"lng"`
+	TeacherID int64  `json:"teacher_id,omitempty" example:"2"`
+	Title     string `json:"title" example:"Math 101"`
+	StartTime string `json:"start_time" example:"2026-05-01T10:00:00Z"`
 }
 
+// Create godoc
+// @Summary      Create a session
+// @Description  Create a new teaching session. Roles: admin, manager, teacher
+// @Tags         Sessions
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      createSessionReq  true  "Session data"
+// @Success      201   {object}  repo.Session
+// @Failure      400   {object}  errorResponse
+// @Failure      401   {object}  errorResponse
+// @Router       /sessions [post]
 func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -49,12 +58,9 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s, err := h.write.Create(r.Context(), uid, service.CreateSessionInput{
-		BranchID:  req.BranchID,
 		TeacherID: req.TeacherID,
 		Title:     req.Title,
 		StartTime: st,
-		Lat:       req.Lat,
-		Lng:       req.Lng,
 		ActorRole: role,
 	})
 	if err != nil {
@@ -64,6 +70,16 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, s)
 }
 
+// List godoc
+// @Summary      List sessions
+// @Description  Retrieve a list of teaching sessions
+// @Tags         Sessions
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit  query     int  false  "Max results"  default(50)
+// @Success      200    {object}  listResponse
+// @Failure      500    {object}  errorResponse
+// @Router       /sessions [get]
 func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if v := r.URL.Query().Get("limit"); v != "" {
@@ -82,6 +98,17 @@ func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Get godoc
+// @Summary      Get session by ID
+// @Description  Retrieve a single session by its ID
+// @Tags         Sessions
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Session ID"
+// @Success      200  {object}  repo.Session
+// @Failure      400  {object}  errorResponse
+// @Failure      404  {object}  errorResponse
+// @Router       /sessions/{id} [get]
 func (h *SessionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, _ := strconv.ParseInt(idStr, 10, 64)

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { branchesApi, sessionsApi, notificationsApi } from '@/api/client'
-import { Building2, CalendarDays, Bell, TrendingUp } from 'lucide-vue-next'
+import { coursesApi, sessionsApi, notificationsApi } from '@/api/client'
+import { GraduationCap, CalendarDays, Bell, TrendingUp } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
 const stats = ref({
-  branches: 0,
+  courses: 0,
   sessions: 0,
   notifications: 0,
 })
@@ -16,11 +16,11 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const [branchRes, sessionRes] = await Promise.all([
-      branchesApi.list({ limit: 100 }),
+    const [courseRes, sessionRes] = await Promise.all([
+      coursesApi.list({ limit: 100 }),
       sessionsApi.list({ limit: 10 }),
     ])
-    stats.value.branches = branchRes.data.count || 0
+    stats.value.courses = courseRes.data.count || 0
     stats.value.sessions = sessionRes.data.count || 0
     recentSessions.value = sessionRes.data.items || []
 
@@ -50,11 +50,11 @@ onMounted(async () => {
       <div class="bg-[#1E1E1E] rounded-2xl p-5 border border-white/5">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-            <Building2 class="w-6 h-6 text-cyan-400" />
+            <GraduationCap class="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <p class="text-2xl font-extrabold text-white">{{ loading ? '...' : stats.branches }}</p>
-            <p class="text-sm text-white/50">Branches</p>
+            <p class="text-2xl font-extrabold text-white">{{ loading ? '...' : stats.courses }}</p>
+            <p class="text-sm text-white/50">Courses</p>
           </div>
         </div>
       </div>

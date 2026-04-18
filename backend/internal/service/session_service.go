@@ -19,19 +19,13 @@ func NewSessionService(r *repo.SessionRepo, audit *AuditService) *SessionService
 }
 
 type CreateSessionInput struct {
-	BranchID  int64
 	TeacherID int64
 	Title     string
 	StartTime time.Time
-	Lat       float64
-	Lng       float64
 	ActorRole string
 }
 
 func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSessionInput) (repo.Session, error) {
-	if in.BranchID <= 0 {
-		return repo.Session{}, errors.New("branch_id is required")
-	}
 	if in.Title == "" {
 		return repo.Session{}, errors.New("title is required")
 	}
@@ -48,12 +42,9 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 	}
 
 	sess := repo.Session{
-		BranchID:  in.BranchID,
 		TeacherID: teacherID,
 		Title:     in.Title,
 		StartTime: in.StartTime.UTC(),
-		Lat:       in.Lat,
-		Lng:       in.Lng,
 	}
 	created, err := s.repo.Create(ctx, sess)
 	if err != nil {
@@ -61,7 +52,6 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 	}
 
 	_ = s.auditSvc.Log(ctx, actorID, "create_session", "session", created.ID, map[string]any{
-		"branch_id":  created.BranchID,
 		"teacher_id": created.TeacherID,
 		"start_time": created.StartTime.UTC().Format(time.RFC3339),
 	})
