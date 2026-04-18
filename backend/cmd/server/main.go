@@ -16,7 +16,21 @@ import (
 	"edupulse/internal/repo"
 	"edupulse/internal/service"
 	"edupulse/internal/workers"
+
+	_ "edupulse/docs"
 )
+
+// @title           EduPulse API
+// @version         1.0
+// @description     Backend API for the EduPulse educational platform.
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter token as: Bearer {your_token}
 
 func main() {
 	addr := env("EDUPULSE_ADDR", ":8080")
@@ -38,12 +52,12 @@ func main() {
 
 	// Repos
 	userRepo := repo.NewUserRepo(database)
-	branchRepo := repo.NewBranchRepo(database)
 	sessionRepo := repo.NewSessionRepo(database)
 	hwRepo := repo.NewHomeworkRepo(database)
 	auditRepo := repo.NewAuditRepo(database)
 	notifRepo := repo.NewNotificationRepo(database)
 	courseRepo := repo.NewCourseRepo(database)
+	videoRepo := repo.NewVideoRepo(database)
 
 	// Event bus + worker
 	bus := events.NewBus(256)
@@ -52,15 +66,18 @@ func main() {
 	auditSvc := service.NewAuditService(auditRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	authSvc := auth.NewService(userRepo, jwtSecret)
-	branchSvc := service.NewBranchService(branchRepo, auditSvc)
 	sessionSvc := service.NewSessionService(sessionRepo, auditSvc)
 	hwSvc := service.NewHomeworkService(hwRepo, auditSvc, bus)
 
 	userSvc := service.NewUserService(userRepo)
-	branchReadSvc := service.NewBranchReadService(branchRepo)
 	sessionReadSvc := service.NewSessionReadService(sessionRepo)
 	hwManageSvc := service.NewHomeworkManageService(hwRepo, auditSvc, bus)
 	courseSvc := service.NewCourseService(courseRepo)
+	statsSvc := service.NewStatsService(userRepo)
+	videoSvc := service.NewVideoService(videoRepo, courseRepo, auditSvc, "./videos", "./hls", 500*1024*1024)
+	if err := service.CheckFFmpeg(); err != nil {
+		log.Printf("warning: ffmpeg not found in PATH; video conversion will be unavailable: %v", err)
+	}
 
 	consumer := workers.NewHomeworkConsumer(notifSvc, auditSvc)
 	bus.StartWorker(context.Background(), consumer)
@@ -69,8 +86,6 @@ func main() {
 		JWTSecret:         jwtSecret,
 		AuthSvc:           authSvc,
 		UserSvc:           userSvc,
-		BranchSvc:         branchSvc,
-		BranchReadSvc:     branchReadSvc,
 		SessionSvc:        sessionSvc,
 		SessionReadSvc:    sessionReadSvc,
 		HomeworkSvc:       hwSvc,
@@ -78,14 +93,17 @@ func main() {
 		AuditSvc:          auditSvc,
 		NotificationSvc:   notifSvc,
 		CourseSvc:         courseSvc,
+		StatsSvc:          statsSvc,
+		VideoSvc:          videoSvc,
+		UserRepo:          userRepo,
 	})
 
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           api.Router(),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      20 * time.Second,
+		ReadTimeout:       10 * time.Minute,
+		WriteTimeout:      10 * time.Minute,
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -104,6 +122,7 @@ func main() {
 	defer cancel()
 
 	_ = srv.Shutdown(ctx)
+	videoSvc.Shutdown()
 	bus.Stop()
 	log.Println("shutdown complete")
 }

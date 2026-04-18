@@ -1,0 +1,845 @@
+basePath: /
+definitions:
+  auth.LoginResult:
+    properties:
+      role:
+        type: string
+      token:
+        type: string
+    type: object
+  handlers.createCourseReq:
+    properties:
+      description:
+        example: Learn Go from scratch
+        type: string
+      image_url:
+        example: /uploads/go.png
+        type: string
+      lessons:
+        items:
+          $ref: '#/definitions/handlers.lessonInput'
+        type: array
+      title:
+        example: Go Programming
+        type: string
+    type: object
+  handlers.createSessionReq:
+    properties:
+      start_time:
+        example: "2026-05-01T10:00:00Z"
+        type: string
+      teacher_id:
+        example: 2
+        type: integer
+      title:
+        example: Math 101
+        type: string
+    type: object
+  handlers.errorResponse:
+    properties:
+      error:
+        example: something went wrong
+        type: string
+    type: object
+  handlers.lessonInput:
+    properties:
+      description:
+        example: In this lesson you will learn the basics
+        type: string
+      file_url:
+        example: /uploads/lesson1.pdf
+        type: string
+      sort_order:
+        example: 1
+        type: integer
+      title:
+        example: Introduction to Go
+        type: string
+      video_url:
+        example: /videos/lesson1.mp4
+        type: string
+    type: object
+  handlers.listResponse:
+    properties:
+      count:
+        example: 10
+        type: integer
+      items: {}
+    type: object
+  handlers.loginReq:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: secret123
+        type: string
+    type: object
+  handlers.patchStatusReq:
+    properties:
+      status:
+        example: approved
+        type: string
+    type: object
+  handlers.registerReq:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: secret123
+        type: string
+      role:
+        enum:
+        - admin
+        - manager
+        - teacher
+        - student
+        - parent
+        example: student
+        type: string
+    type: object
+  handlers.submitHomeworkReq:
+    properties:
+      content:
+        example: My homework answer
+        type: string
+      session_id:
+        example: 1
+        type: integer
+    type: object
+  handlers.updateLessonReq:
+    properties:
+      description:
+        example: Updated description
+        type: string
+      file_url:
+        example: /uploads/lesson1.pdf
+        type: string
+      sort_order:
+        example: 1
+        type: integer
+      title:
+        example: Updated lesson title
+        type: string
+      video_url:
+        example: /videos/lesson1.mp4
+        type: string
+    type: object
+  repo.HomeworkSubmission:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      session_id:
+        type: integer
+      status:
+        type: string
+      student_id:
+        type: integer
+    type: object
+  repo.Lesson:
+    properties:
+      course_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      file_url:
+        type: string
+      hls_url:
+        type: string
+      id:
+        type: integer
+      sort_order:
+        type: integer
+      title:
+        type: string
+      video_status:
+        type: string
+      video_url:
+        type: string
+    type: object
+  repo.RoleCount:
+    properties:
+      online:
+        type: integer
+      role:
+        type: string
+      total:
+        type: integer
+    type: object
+  repo.Session:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      start_time:
+        type: string
+      teacher_id:
+        type: integer
+      title:
+        type: string
+    type: object
+  repo.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      role:
+        type: string
+    type: object
+  repo.VideoUpload:
+    properties:
+      created_at:
+        type: string
+      error_message:
+        type: string
+      finished_at:
+        type: string
+      hls_path:
+        type: string
+      id:
+        type: integer
+      lesson_id:
+        type: integer
+      original_filename:
+        type: string
+      status:
+        type: string
+      stored_path:
+        type: string
+    type: object
+  service.CourseWithLessons:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      lessons:
+        items:
+          $ref: '#/definitions/repo.Lesson'
+        type: array
+      title:
+        type: string
+    type: object
+  service.StatsResult:
+    properties:
+      roles:
+        items:
+          $ref: '#/definitions/repo.RoleCount'
+        type: array
+      total_online:
+        type: integer
+      total_users:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend API for the EduPulse educational platform.
+  title: EduPulse API
+  version: "1.0"
+paths:
+  /audit-logs:
+    get:
+      description: 'Retrieve recent audit log entries. Roles: admin'
+      parameters:
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit logs
+      tags:
+      - Audit
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user with email and password, returns a JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      summary: Login user
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account and return a JWT token
+      parameters:
+      - description: Registration data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/auth.LoginResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      summary: Register user
+      tags:
+      - Auth
+  /courses:
+    get:
+      description: Retrieve courses with their lessons
+      parameters:
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List courses with lessons
+      tags:
+      - Courses
+    post:
+      consumes:
+      - application/json
+      description: 'Create a new course, optionally with lessons in one request. Roles:
+        admin, manager, teacher'
+      parameters:
+      - description: Course data with optional lessons array
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createCourseReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/service.CourseWithLessons'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a course with lessons
+      tags:
+      - Courses
+  /courses/{id}/lessons:
+    post:
+      consumes:
+      - application/json
+      description: 'Add a new lesson to an existing course. Roles: admin, manager,
+        teacher'
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Lesson data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.lessonInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/repo.Lesson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a lesson to a course
+      tags:
+      - Courses
+  /courses/{id}/lessons/{lessonId}:
+    put:
+      consumes:
+      - application/json
+      description: 'Update an existing lesson''s content. Roles: admin, manager, teacher'
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Lesson ID
+        in: path
+        name: lessonId
+        required: true
+        type: integer
+      - description: Updated lesson data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateLessonReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.Lesson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a lesson
+      tags:
+      - Courses
+  /homework:
+    get:
+      description: 'Retrieve homework submissions with filters. Roles: admin, teacher,
+        manager'
+      parameters:
+      - description: Filter by session ID
+        in: query
+        name: session_id
+        type: integer
+      - description: Filter by student ID
+        in: query
+        name: student_id
+        type: integer
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List homework submissions
+      tags:
+      - Homework
+  /homework/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: 'Update the status of a homework submission. Roles: admin, teacher'
+      parameters:
+      - description: Submission ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.patchStatusReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.HomeworkSubmission'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update homework status
+      tags:
+      - Homework
+  /homework/mine:
+    get:
+      description: Retrieve homework submissions for the authenticated student
+      parameters:
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my homework submissions
+      tags:
+      - Homework
+  /homework/submit:
+    post:
+      consumes:
+      - application/json
+      description: 'Submit a homework assignment. Roles: admin, student'
+      parameters:
+      - description: Homework submission
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.submitHomeworkReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/repo.HomeworkSubmission'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit homework
+      tags:
+      - Homework
+  /lessons/{id}/video:
+    get:
+      description: Returns the latest video upload record for the lesson.
+      parameters:
+      - description: Lesson ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.VideoUpload'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get video upload status for a lesson
+      tags:
+      - Videos
+    post:
+      consumes:
+      - multipart/form-data
+      description: 'Upload a video file for a lesson. Conversion to HLS runs asynchronously.
+        Max 500MB. Allowed formats: mp4, mov, mkv. Roles: admin, manager, teacher'
+      parameters:
+      - description: Lesson ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Video file
+        in: formData
+        name: video
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/repo.VideoUpload'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload video for a lesson
+      tags:
+      - Videos
+  /notifications:
+    get:
+      description: 'Retrieve recent notifications. Roles: admin, manager'
+      parameters:
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List notifications
+      tags:
+      - Notifications
+  /sessions:
+    get:
+      description: Retrieve a list of teaching sessions
+      parameters:
+      - default: 50
+        description: Max results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List sessions
+      tags:
+      - Sessions
+    post:
+      consumes:
+      - application/json
+      description: 'Create a new teaching session. Roles: admin, manager, teacher'
+      parameters:
+      - description: Session data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createSessionReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/repo.Session'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a session
+      tags:
+      - Sessions
+  /sessions/{id}:
+    get:
+      description: Retrieve a single session by its ID
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.Session'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get session by ID
+      tags:
+      - Sessions
+  /stats:
+    get:
+      description: 'User counts per role and online status. Roles: admin'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.StatsResult'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Platform statistics
+      tags:
+      - Stats
+  /users/me:
+    get:
+      description: Returns the profile of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - Users
+securityDefinitions:
+  BearerAuth:
+    description: 'Enter token as: Bearer {your_token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

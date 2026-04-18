@@ -10,22 +10,11 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-type Branch struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Lat       float64   `json:"lat"`
-	Lng       float64   `json:"lng"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type Session struct {
 	ID        int64     `json:"id"`
-	BranchID  int64     `json:"branch_id"`
 	TeacherID int64     `json:"teacher_id"`
 	Title     string    `json:"title"`
 	StartTime time.Time `json:"start_time"`
-	Lat       float64   `json:"lat"`
-	Lng       float64   `json:"lng"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -65,19 +54,26 @@ type Course struct {
 }
 
 type Lesson struct {
-	ID        int64     `json:"id"`
-	CourseID  int64     `json:"course_id"`
-	Title     string    `json:"title"`
-	VideoURL  string    `json:"video_url"`
-	SortOrder int       `json:"sort_order"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64     `json:"id"`
+	CourseID    int64     `json:"course_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	VideoURL    string    `json:"video_url"`
+	FileURL     string    `json:"file_url"`
+	HLSUrl      string    `json:"hls_url"`
+	VideoStatus string    `json:"video_status"`
+	SortOrder   int       `json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
-type Review struct {
-	ID        int64     `json:"id"`
-	CourseID  int64     `json:"course_id"`
-	UserID    int64     `json:"user_id"`
-	Rating    int       `json:"rating"`
-	Comment   string    `json:"comment"`
-	CreatedAt time.Time `json:"created_at"`
+type VideoUpload struct {
+	ID               int64     `json:"id"`
+	LessonID         int64     `json:"lesson_id"`
+	OriginalFilename string    `json:"original_filename"`
+	StoredPath       string    `json:"stored_path"`
+	HLSPath          string    `json:"hls_path"`
+	Status           string    `json:"status"`
+	ErrorMessage     string    `json:"error_message"`
+	CreatedAt        time.Time `json:"created_at"`
+	FinishedAt       time.Time `json:"finished_at"`
 }

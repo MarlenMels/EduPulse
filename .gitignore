@@ -1,5 +1,9 @@
 # Backend
 backend/edupulse.db
+backend/server
+backend/videos/
+backend/hls/
+backend/uploads/
 
 # Frontend
 frontend/node_modules/
