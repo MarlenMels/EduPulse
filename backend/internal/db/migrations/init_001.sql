@@ -5,27 +5,16 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS branches (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    lat REAL NOT NULL,
-    lng REAL NOT NULL,
+    last_seen_at TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    branch_id INTEGER NOT NULL,
     teacher_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     start_time TEXT NOT NULL,
-    lat REAL NOT NULL,
-    lng REAL NOT NULL,
     created_at TEXT NOT NULL,
-    FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY(teacher_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);

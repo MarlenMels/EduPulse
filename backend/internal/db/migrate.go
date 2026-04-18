@@ -29,6 +29,9 @@ func Migrate(db *sql.DB) error {
 			continue
 		}
 		if _, err := db.Exec(sqlText); err != nil {
+			if strings.Contains(err.Error(), "duplicate column") {
+				continue
+			}
 			return fmt.Errorf("apply %s: %w", name, err)
 		}
 	}

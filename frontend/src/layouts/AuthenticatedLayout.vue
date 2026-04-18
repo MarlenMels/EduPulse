@@ -4,12 +4,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   LayoutDashboard,
-  Building2,
   CalendarDays,
+  GraduationCap,
   BookOpen,
   User,
   Bell,
   ShieldCheck,
+  BarChart3,
   LogOut,
   Menu,
   X,
@@ -36,10 +37,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
-  { label: 'Branches', icon: Building2, to: '/branches' },
+  { label: 'Courses', icon: GraduationCap, to: '/courses' },
   { label: 'Sessions', icon: CalendarDays, to: '/sessions' },
   { label: 'Homework', icon: BookOpen, to: '/homework' },
   { label: 'Notifications', icon: Bell, to: '/notifications', roles: ['admin', 'manager'] },
+  { label: 'Statistics', icon: BarChart3, to: '/stats', roles: ['admin'] },
   { label: 'Audit Logs', icon: ShieldCheck, to: '/audit', roles: ['admin'] },
   { label: 'Profile', icon: User, to: '/profile' },
 ]

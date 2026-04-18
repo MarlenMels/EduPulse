@@ -33,18 +33,6 @@ const router = createRouter({
       ],
     },
     {
-      path: '/branches',
-      component: () => import('@/layouts/AuthenticatedLayout.vue'),
-      meta: { requiresAuth: true },
-      children: [
-        {
-          path: '',
-          name: 'branches',
-          component: () => import('@/views/BranchesView.vue'),
-        },
-      ],
-    },
-    {
       path: '/sessions',
       component: () => import('@/layouts/AuthenticatedLayout.vue'),
       meta: { requiresAuth: true },
@@ -53,6 +41,18 @@ const router = createRouter({
           path: '',
           name: 'sessions',
           component: () => import('@/views/SessionsView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/courses',
+      component: () => import('@/layouts/AuthenticatedLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'courses',
+          component: () => import('@/views/CoursesView.vue'),
         },
       ],
     },
@@ -89,6 +89,18 @@ const router = createRouter({
           path: '',
           name: 'audit',
           component: () => import('@/views/AuditView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/stats',
+      component: () => import('@/layouts/AuthenticatedLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'stats',
+          component: () => import('@/views/StatsView.vue'),
         },
       ],
     },
