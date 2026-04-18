@@ -14,32 +14,42 @@ func NewCourseService(r *repo.CourseRepo) *CourseService {
 	return &CourseService{repo: r}
 }
 
-type CourseWithDetails struct {
+type CourseWithLessons struct {
 	repo.Course
 	Lessons []repo.Lesson `json:"lessons"`
-	Reviews []repo.Review `json:"reviews"`
 }
 
-func (s *CourseService) List(ctx context.Context, limit int) ([]CourseWithDetails, error) {
+func (s *CourseService) CreateWithLessons(ctx context.Context, c repo.Course, lessons []repo.Lesson) (CourseWithLessons, error) {
+	course, created, err := s.repo.CreateWithLessons(ctx, c, lessons)
+	if err != nil {
+		return CourseWithLessons{}, err
+	}
+	return CourseWithLessons{Course: course, Lessons: created}, nil
+}
+
+func (s *CourseService) AddLesson(ctx context.Context, l repo.Lesson) (repo.Lesson, error) {
+	return s.repo.CreateLesson(ctx, l)
+}
+
+func (s *CourseService) UpdateLesson(ctx context.Context, l repo.Lesson) (repo.Lesson, error) {
+	return s.repo.UpdateLesson(ctx, l)
+}
+
+func (s *CourseService) List(ctx context.Context, limit int) ([]CourseWithLessons, error) {
 	courses, err := s.repo.List(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]CourseWithDetails, 0, len(courses))
+	out := make([]CourseWithLessons, 0, len(courses))
 	for _, c := range courses {
 		lessons, err := s.repo.LessonsByCourse(ctx, c.ID)
 		if err != nil {
 			return nil, err
 		}
-		reviews, err := s.repo.ReviewsByCourse(ctx, c.ID)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, CourseWithDetails{
+		out = append(out, CourseWithLessons{
 			Course:  c,
 			Lessons: lessons,
-			Reviews: reviews,
 		})
 	}
 	return out, nil

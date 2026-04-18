@@ -14,10 +14,21 @@ type AuthHandler struct {
 func NewAuthHandler(svc *auth.Service) *AuthHandler { return &AuthHandler{svc: svc} }
 
 type loginReq struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"secret123"`
 }
 
+// Login godoc
+// @Summary      Login user
+// @Description  Authenticate a user with email and password, returns a JWT token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      loginReq  true  "Login credentials"
+// @Success      200   {object}  auth.LoginResult
+// @Failure      400   {object}  errorResponse
+// @Failure      401   {object}  errorResponse
+// @Router       /auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
 	if err := decodeJSON(r, &req); err != nil {
@@ -39,11 +50,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 type registerReq struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"secret123"`
+	Role     string `json:"role" example:"student" enums:"admin,manager,teacher,student,parent"`
 }
 
+// Register godoc
+// @Summary      Register user
+// @Description  Create a new user account and return a JWT token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      registerReq  true  "Registration data"
+// @Success      201   {object}  auth.LoginResult
+// @Failure      400   {object}  errorResponse
+// @Failure      409   {object}  errorResponse
+// @Router       /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerReq
 	if err := decodeJSON(r, &req); err != nil {

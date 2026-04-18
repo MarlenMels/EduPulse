@@ -11,6 +11,16 @@ type AuditHandler struct{ svc *service.AuditService }
 
 func NewAuditHandler(svc *service.AuditService) *AuditHandler { return &AuditHandler{svc: svc} }
 
+// List godoc
+// @Summary      List audit logs
+// @Description  Retrieve recent audit log entries. Roles: admin
+// @Tags         Audit
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit  query     int  false  "Max results"  default(50)
+// @Success      200    {object}  listResponse
+// @Failure      500    {object}  errorResponse
+// @Router       /audit-logs [get]
 func (h *AuditHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if v := r.URL.Query().Get("limit"); v != "" {

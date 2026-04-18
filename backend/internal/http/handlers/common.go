@@ -5,6 +5,19 @@ import (
 	"net/http"
 )
 
+// errorResponse is the standard error envelope.
+// swagger:model
+type errorResponse struct {
+	Error string `json:"error" example:"something went wrong"`
+}
+
+// listResponse is a generic list envelope used by list endpoints.
+// swagger:model
+type listResponse struct {
+	Items any `json:"items"`
+	Count int `json:"count" example:"10"`
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
