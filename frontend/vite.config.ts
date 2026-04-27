@@ -13,6 +13,8 @@ export default defineConfig({
     vueDevTools(),
   ],
   server: {
+    host: true,
+    allowedHosts: ['.trycloudflare.com', '.loca.lt', '.ngrok-free.app', '.ngrok.app'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
