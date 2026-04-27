@@ -2,9 +2,17 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 
 	"edupulse/internal/auth"
+)
+
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+const (
+	minPasswordLen = 6
+	maxPasswordLen = 72 // bcrypt limit
 )
 
 type AuthHandler struct {
@@ -38,6 +46,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Email == "" || req.Password == "" {
 		writeError(w, http.StatusBadRequest, "email and password are required")
+		return
+	}
+	if len(req.Password) > maxPasswordLen {
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
@@ -75,6 +87,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Email == "" || req.Password == "" {
 		writeError(w, http.StatusBadRequest, "email and password are required")
+		return
+	}
+	if !emailRegex.MatchString(req.Email) {
+		writeError(w, http.StatusBadRequest, "invalid email format")
+		return
+	}
+	if len(req.Password) < minPasswordLen {
+		writeError(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+	if len(req.Password) > maxPasswordLen {
+		writeError(w, http.StatusBadRequest, "password must be at most 72 characters")
 		return
 	}
 	if !auth.IsValidRole(req.Role) {

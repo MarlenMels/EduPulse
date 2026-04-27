@@ -30,7 +30,13 @@ async function handleSubmit() {
     await auth.login(email.value.trim(), password.value.trim())
     router.push('/dashboard')
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.error || 'Login failed'
+    if (e.response?.data?.error) {
+      errorMsg.value = e.response.data.error
+    } else if (e.code === 'ERR_NETWORK' || e.message === 'Network Error') {
+      errorMsg.value = 'Cannot reach server. Check your connection and try again.'
+    } else {
+      errorMsg.value = 'Login failed. Please try again.'
+    }
   } finally {
     submitting.value = false
   }
