@@ -98,25 +98,36 @@ function blobPath(prefix: 'videos' | 'materials', file: File) {
 async function uploadToBlob(prefix: 'videos' | 'materials', file: File, onProgress?: (pct: number) => void) {
   const token = localStorage.getItem('token') || ''
   const abortController = new AbortController()
-  let timeout = window.setTimeout(() => abortController.abort(), 45_000)
+  let rejectStall: (error: Error) => void = () => {}
+  const stallTimeout = new Promise<never>((_, reject) => {
+    rejectStall = reject
+  })
+  const failStalledUpload = () => {
+    abortController.abort()
+    rejectStall(new Error('Upload service did not respond for 20 seconds. Check /api/blob-upload and Vercel Blob environment variables.'))
+  }
+  let timeout = window.setTimeout(failStalledUpload, 20_000)
   const keepAlive = () => {
     window.clearTimeout(timeout)
-    timeout = window.setTimeout(() => abortController.abort(), 45_000)
+    timeout = window.setTimeout(failStalledUpload, 20_000)
   }
 
   try {
     if (onProgress) onProgress(1)
-    const blob = await uploadBlob(blobPath(prefix, file), file, {
-      access: 'public',
-      handleUploadUrl: '/api/blob-upload',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      multipart: file.size > 8 * 1024 * 1024,
-      abortSignal: abortController.signal,
-      onUploadProgress: (event) => {
-        keepAlive()
-        if (onProgress) onProgress(Math.max(1, Math.round(event.percentage)))
-      },
-    })
+    const blob = await Promise.race([
+      uploadBlob(blobPath(prefix, file), file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        multipart: file.size > 8 * 1024 * 1024,
+        abortSignal: abortController.signal,
+        onUploadProgress: (event) => {
+          keepAlive()
+          if (onProgress) onProgress(Math.max(1, Math.round(event.percentage)))
+        },
+      }),
+      stallTimeout,
+    ])
     return { url: blob.url, name: file.name, size: file.size }
   } catch (error: any) {
     if (error?.name === 'AbortError') {
