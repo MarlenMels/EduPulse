@@ -131,22 +131,22 @@ function reset() {
         <Upload class="w-6 h-6 text-cyan-400" />
       </div>
       <div>
-        <div class="text-white font-semibold">Перетащите видео или выберите файл</div>
-        <div class="text-white/40 text-sm">mp4, mov, mkv до 500MB</div>
+        <div class="text-white font-semibold">Move video here or file</div>
+        <div class="text-white/40 text-sm">mp4, mov, mkv up to 500MB</div>
       </div>
       <button
         type="button"
         class="bg-cyan-400 hover:bg-cyan-500 text-black rounded-xl px-4 py-2 font-semibold"
         @click="pickFile"
       >
-        Выбрать файл
+        Choose file
       </button>
     </div>
 
     <div v-else-if="status === 'uploading'" class="space-y-3">
       <div class="flex items-center gap-2 text-white/80">
         <Loader2 class="w-4 h-4 text-cyan-400 animate-spin" />
-        <span class="text-sm truncate">Загрузка: {{ fileName }}</span>
+        <span class="text-sm truncate">Upload: {{ fileName }}</span>
         <span class="ml-auto text-white/60 text-sm">{{ progress }}%</span>
       </div>
       <div class="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -157,15 +157,15 @@ function reset() {
     <div v-else-if="status === 'processing'" class="flex items-center gap-3 text-white/80">
       <Loader2 class="w-5 h-5 text-cyan-400 animate-spin" />
       <div>
-        <div class="font-semibold text-white">Обработка видео…</div>
-        <div class="text-white/40 text-sm">Конвертация в HLS может занять несколько минут</div>
+        <div class="font-semibold text-white">Processing video…</div>
+        <div class="text-white/40 text-sm">Converting to HLS may take several minutes</div>
       </div>
     </div>
 
     <div v-else-if="status === 'ready'" class="flex items-center gap-3">
       <CheckCircle2 class="w-5 h-5 text-cyan-400" />
       <div class="flex-1">
-        <div class="text-white font-semibold">Готово</div>
+        <div class="text-white font-semibold">Ready</div>
         <div class="text-white/40 text-sm truncate">{{ fileName }}</div>
       </div>
       <button
@@ -173,14 +173,14 @@ function reset() {
         class="text-white/60 hover:text-white text-sm rounded-xl px-3 py-1.5 bg-white/5 hover:bg-white/10"
         @click="reset"
       >
-        Загрузить ещё
+        Upload another
       </button>
     </div>
 
     <div v-else-if="status === 'failed'" class="flex items-center gap-3">
       <XCircle class="w-5 h-5 text-red-400" />
       <div class="flex-1">
-        <div class="text-white font-semibold">Ошибка</div>
+        <div class="text-white font-semibold">Error</div>
         <div class="text-white/60 text-sm">{{ errorMsg }}</div>
       </div>
       <button
@@ -188,7 +188,7 @@ function reset() {
         class="text-white/60 hover:text-white text-sm rounded-xl px-3 py-1.5 bg-white/5 hover:bg-white/10"
         @click="reset"
       >
-        Повторить
+        Retry
       </button>
     </div>
   </div>
