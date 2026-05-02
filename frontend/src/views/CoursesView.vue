@@ -109,7 +109,7 @@ function validOptionalUrl(value: string) {
 }
 
 function setNewLessonVideo(e: Event) {
-  newLessonVideoFiles.value = Array.from((e.target as HTMLInputElement).files || [])
+  newLessonVideoFiles.value = Array.from((e.target as HTMLInputElement).files || []).slice(0, 1)
 }
 
 function setNewLessonMaterial(e: Event) {
@@ -117,7 +117,7 @@ function setNewLessonMaterial(e: Event) {
 }
 
 function setEditLessonVideo(e: Event) {
-  editLessonVideoFiles.value = Array.from((e.target as HTMLInputElement).files || [])
+  editLessonVideoFiles.value = Array.from((e.target as HTMLInputElement).files || []).slice(0, 1)
 }
 
 function setEditLessonMaterial(e: Event) {
@@ -147,7 +147,7 @@ function lessonVideoAssets(lesson: any) {
   if (fallbackUrl && !assets.some((asset: any) => asset.url === fallbackUrl)) {
     assets.push({ id: 0, lesson_id: lesson.id, type: 'video', url: fallbackUrl, original_filename: 'Video' })
   }
-  return assets
+  return assets.slice(-1)
 }
 
 function lessonFileAssets(lesson: any) {
@@ -228,8 +228,9 @@ async function submitAddLesson() {
       const material = await uploadsApi.upload(file)
       await coursesApi.addLessonAsset(created.data.id, { type: 'file', url: material.data.url, original_filename: file.name })
     }
-    for (const file of newLessonVideoFiles.value) {
-      await videoApi.upload(created.data.id, file)
+    const videoFile = newLessonVideoFiles.value[0]
+    if (videoFile) {
+      await videoApi.upload(created.data.id, videoFile)
     }
     showAddLessonModal.value = false
     await fetchCourses()
@@ -285,8 +286,9 @@ async function saveEditLesson(courseId: number) {
       const material = await uploadsApi.upload(file)
       await coursesApi.addLessonAsset(editingLessonId.value!, { type: 'file', url: material.data.url, original_filename: file.name })
     }
-    for (const file of editLessonVideoFiles.value) {
-      await videoApi.upload(editingLessonId.value!, file)
+    const videoFile = editLessonVideoFiles.value[0]
+    if (videoFile) {
+      await videoApi.upload(editingLessonId.value!, videoFile)
     }
     editingLessonId.value = null
     await fetchCourses()
@@ -553,7 +555,7 @@ onMounted(fetchCourses)
                 </div>
 
                 <VideoUploader
-                  v-if="canManage && lesson.video_status !== 'processing'"
+                  v-if="canManage && lesson.video_status !== 'processing' && !lessonVideoAssets(lesson).length"
                   :lesson-id="lesson.id"
                   @uploaded="onVideoUploaded(course.id)"
                   @failed="fetchCourses"
@@ -571,10 +573,10 @@ onMounted(fetchCourses)
                   <div class="bg-[#2D2D2D] rounded-xl border border-transparent p-3">
                     <div class="flex items-start justify-between gap-3">
                       <label class="block flex-1 text-white/70 text-sm cursor-pointer">
-                        Video files
-                        <input type="file" multiple accept=".mp4,.mov,.mkv,video/*" class="hidden" @change="setEditLessonVideo" />
+                        Video file
+                        <input type="file" accept=".mp4,.mov,.mkv,video/*" class="hidden" @change="setEditLessonVideo" />
                         <span class="block mt-1 text-xs text-white/40 truncate">
-                          {{ editLessonVideoFiles.length ? `${editLessonVideoFiles.length} selected` : 'Choose videos' }}
+                          {{ editLessonVideoFiles.length ? editLessonVideoFiles[0]?.name : (lessonVideoAssets(lesson).length ? 'Replace current video' : 'Choose video') }}
                         </span>
                       </label>
                     </div>
@@ -747,10 +749,10 @@ onMounted(fetchCourses)
                 <textarea v-model="newLesson.description" maxlength="2000" rows="3" placeholder="Lesson description" class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-transparent focus:border-cyan-400 focus:outline-none resize-none" />
               </div>
               <div>
-                <label class="block text-sm font-semibold text-white/70 mb-1.5">Video Files</label>
+                <label class="block text-sm font-semibold text-white/70 mb-1.5">Video File</label>
                 <label class="block px-4 py-3 bg-[#2D2D2D] rounded-xl text-white/70 text-sm border border-transparent hover:border-cyan-400 cursor-pointer">
-                  <input type="file" multiple accept=".mp4,.mov,.mkv,video/*" class="hidden" @change="setNewLessonVideo" />
-                  <span class="block truncate">{{ newLessonVideoFiles.length ? `${newLessonVideoFiles.length} selected` : 'Choose videos' }}</span>
+                  <input type="file" accept=".mp4,.mov,.mkv,video/*" class="hidden" @change="setNewLessonVideo" />
+                  <span class="block truncate">{{ newLessonVideoFiles.length ? newLessonVideoFiles[0]?.name : 'Choose video' }}</span>
                 </label>
               </div>
               <div>

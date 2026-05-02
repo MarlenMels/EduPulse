@@ -34,6 +34,12 @@ type updateLessonReq struct {
 	SortOrder   int    `json:"sort_order" example:"1"`
 }
 
+type lessonAssetReq struct {
+	Type             string `json:"type" example:"file"`
+	URL              string `json:"url" example:"/uploads/material.pdf"`
+	OriginalFilename string `json:"original_filename" example:"material.pdf"`
+}
+
 type CourseHandler struct {
 	svc *service.CourseService
 }
@@ -232,21 +238,67 @@ func (h *CourseHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Stubs for routes wired up in server.go but whose handlers haven't been
-// implemented yet. They return 501 so the build stays green and the feature
-// surface is obvious to the next caller.
 func (h *CourseHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, "course delete not implemented")
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if id <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid course id")
+		return
+	}
+	if err := h.svc.Delete(r.Context(), id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *CourseHandler) DeleteLesson(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, "lesson delete not implemented")
+	courseID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
+	if courseID <= 0 || lessonID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.DeleteLesson(r.Context(), courseID, lessonID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *CourseHandler) AddLessonAsset(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, "lesson asset upload not implemented")
+	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
+	if lessonID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid lesson id")
+		return
+	}
+	var req lessonAssetReq
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
+		return
+	}
+	asset, err := h.svc.AddLessonAsset(r.Context(), repo.LessonAsset{
+		LessonID:         lessonID,
+		Type:             req.Type,
+		URL:              req.URL,
+		OriginalFilename: req.OriginalFilename,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, asset)
 }
 
 func (h *CourseHandler) DeleteLessonAsset(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, "lesson asset delete not implemented")
+	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
+	assetID, _ := strconv.ParseInt(chi.URLParam(r, "assetId"), 10, 64)
+	if lessonID <= 0 || assetID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.DeleteLessonAsset(r.Context(), lessonID, assetID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

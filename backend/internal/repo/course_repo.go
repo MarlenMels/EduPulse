@@ -185,6 +185,11 @@ func (r *CourseRepo) CreateLessonAsset(ctx context.Context, asset LessonAsset) (
 	return asset, nil
 }
 
+func (r *CourseRepo) DeleteLessonAssetsByType(ctx context.Context, lessonID int64, assetType string) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM lesson_assets WHERE lesson_id = $1 AND type = $2", lessonID, assetType)
+	return err
+}
+
 func (r *CourseRepo) AssetsByLesson(ctx context.Context, lessonID int64) ([]LessonAsset, error) {
 	rows, err := r.db.QueryContext(ctx,
 		"SELECT id, lesson_id, type, url, original_filename, created_at FROM lesson_assets WHERE lesson_id = $1 ORDER BY id",
@@ -222,6 +227,9 @@ func (r *CourseRepo) UpdateVideoStatus(ctx context.Context, lessonID int64, stat
 }
 
 func (r *CourseRepo) ClearVideo(ctx context.Context, lessonID int64) error {
+	if err := r.DeleteLessonAssetsByType(ctx, lessonID, "video"); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx,
 		"UPDATE lessons SET video_url = '', hls_url = '', video_status = '' WHERE id = $1",
 		lessonID,

@@ -124,6 +124,7 @@ func (s *VideoService) SaveAndConvert(ctx context.Context, lessonID, userID int6
 		}
 		upload.Status = "ready"
 		upload.HLSPath = videoURL
+		_ = s.courses.DeleteLessonAssetsByType(ctx, lessonID, "video")
 		if s.audit != nil {
 			_ = s.audit.Log(ctx, userID, "video.upload", "lesson", lessonID, map[string]any{
 				"upload_id": upload.ID,
@@ -206,6 +207,9 @@ func (s *VideoService) convertToHLS(uploadID, lessonID, userID int64, srcPath, o
 	if err := s.courses.UpdateVideoStatus(bg, lessonID, "ready", hlsURL); err != nil {
 		log.Printf("video: lesson %d status update failed: %v", lessonID, err)
 	}
+	if err := s.courses.DeleteLessonAssetsByType(bg, lessonID, "video"); err != nil {
+		log.Printf("video: lesson %d old video assets delete failed: %v", lessonID, err)
+	}
 	if _, err := s.courses.CreateLessonAsset(bg, repo.LessonAsset{
 		LessonID:         lessonID,
 		Type:             "video",
@@ -274,6 +278,9 @@ func (s *VideoService) SaveExternalURL(ctx context.Context, lessonID, userID int
 	}
 	upload.Status = "ready"
 	upload.HLSPath = url
+	if err := s.courses.DeleteLessonAssetsByType(ctx, lessonID, "video"); err != nil {
+		return repo.VideoUpload{}, err
+	}
 
 	if s.audit != nil {
 		_ = s.audit.Log(ctx, userID, "video.blob", "lesson", lessonID, map[string]any{

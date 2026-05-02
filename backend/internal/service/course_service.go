@@ -58,6 +58,11 @@ func (s *CourseService) AddLessonAsset(ctx context.Context, asset repo.LessonAss
 	if asset.URL == "" {
 		return repo.LessonAsset{}, errors.New("url is required")
 	}
+	if asset.Type == "video" {
+		if err := s.repo.DeleteLessonAssetsByType(ctx, asset.LessonID, "video"); err != nil {
+			return repo.LessonAsset{}, err
+		}
+	}
 	return s.repo.CreateLessonAsset(ctx, asset)
 }
 
