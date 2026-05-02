@@ -34,16 +34,20 @@ import (
 
 func main() {
 	addr := env("EDUPULSE_ADDR", ":8080")
-	dbPath := env("EDUPULSE_DB_PATH", "./edupulse.db")
+	dbCfg := &db.Config{
+		URL:  env("EDUPULSE_DB_URL", ""),
+		Path: env("EDUPULSE_DB_PATH", "./edupulse.db"),
+	}
 	jwtSecret := env("EDUPULSE_JWT_SECRET", "dev-secret-change-me")
 
-	database, err := db.OpenSQLite(dbPath)
+	database, err := db.Open(dbCfg)
 	if err != nil {
 		log.Fatalf("db open: %v", err)
 	}
 	defer database.Close()
+	log.Printf("EduPulse using %s", dbCfg.Driver)
 
-	if err := db.Migrate(database); err != nil {
+	if err := db.Migrate(database, dbCfg.Driver); err != nil {
 		log.Fatalf("db migrate: %v", err)
 	}
 	if err := db.Seed(database); err != nil {
@@ -108,7 +112,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("EduPulse backend listening on %s (db=%s)", addr, dbPath)
+		log.Printf("EduPulse backend listening on %s (driver=%s)", addr, dbCfg.Driver)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}

@@ -40,7 +40,8 @@ Server starts at `http://localhost:8080`. The SQLite database is created automat
 | Variable | Default | Description |
 |---|---|---|
 | `EDUPULSE_ADDR` | `:8080` | Server address |
-| `EDUPULSE_DB_PATH` | `./edupulse.db` | Path to SQLite file |
+| `EDUPULSE_DB_URL` | _(empty)_ | Postgres connection string. When set, the backend uses Postgres instead of SQLite. Example: `postgres://user:pass@host:5432/dbname?sslmode=require` |
+| `EDUPULSE_DB_PATH` | `./edupulse.db` | Path to SQLite file. Used only when `EDUPULSE_DB_URL` is empty. |
 | `EDUPULSE_JWT_SECRET` | `dev-secret-change-me` | JWT signing secret |
 
 **Test users** (created on first run):
@@ -65,11 +66,37 @@ npm run dev
 
 Opens at `http://localhost:5173`. The Vite dev server proxies API requests to the backend (`localhost:8080`).
 
+## Production Deployment
+
+The backend runs on Railway, the frontend on Vercel.
+
+### Persisting data on Railway (SQLite)
+
+Railway containers have an **ephemeral filesystem** — every redeploy wipes the SQLite file, all uploaded videos, and HLS chunks. Use a Railway Volume so the data survives.
+
+1. Railway → service → **Settings → Volumes → New Volume**, mount path: `/data`
+2. Add environment variables on the same service:
+   - `EDUPULSE_DB_PATH=/data/edupulse.db`
+3. Redeploy.
+
+> The `videos/`, `hls/`, and `uploads/` directories also currently live on the local filesystem. Until they are moved to object storage (e.g. S3), put them on the same Volume by changing the working directory or symlinking inside `/data`.
+
+### Switching to Postgres (recommended for production)
+
+For more than one instance, real backups, and concurrent writes, use Postgres.
+
+1. Railway → project → **+ New → Database → Postgres**. Railway exposes `DATABASE_URL`.
+2. On the backend service set:
+   - `EDUPULSE_DB_URL` = the Postgres URL (copy it from the Postgres service variables)
+3. Redeploy. On startup the backend detects the URL, runs the Postgres migrations from `internal/db/migrations_pg/`, and seeds the same default users.
+
+The backend supports either driver — when `EDUPULSE_DB_URL` is empty it falls back to SQLite (`EDUPULSE_DB_PATH`). Local development can stay on SQLite without any code change.
+
 ## Tech Stack
 
 | Layer | Technologies |
 |---|---|
-| **Backend** | Go, Chi Router, SQLite (modernc.org/sqlite), JWT, bcrypt, Swaggo |
+| **Backend** | Go, Chi Router, SQLite (modernc.org/sqlite) or Postgres (pgx/v5), JWT, bcrypt, Swaggo |
 | **Frontend** | Vue 3, TypeScript, Tailwind CSS v4, Pinia, Vue Router, Axios |
 | **Infrastructure** | Vite, HLS Streaming, Event Bus |
 

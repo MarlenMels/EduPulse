@@ -47,14 +47,19 @@ func (h *HomeworkHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req submitHomeworkReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
+		return
+	}
+	content, err := normalizeRequiredText(req.Content, "content", 5000)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	sub, err := h.submit.Submit(r.Context(), uid, service.SubmitHomeworkInput{
 		SessionID: req.SessionID,
-		Content:   req.Content,
+		Content:   content,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -86,12 +91,12 @@ func (h *HomeworkHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	f.Status = strings.TrimSpace(r.URL.Query().Get("status"))
 
-	f.Limit = 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Limit = n
-		}
+	limit, err := parseLimitParam(r, 50)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
+	f.Limit = limit
 
 	items, err := h.manage.List(r.Context(), f)
 	if err != nil {
@@ -123,18 +128,14 @@ func (h *HomeworkHandler) Mine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
-	limit := 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
+	limit, err := parseLimitParam(r, 50)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	role, _ := middleware.RoleFromContext(r.Context())
-	var (
-		items []repo.HomeworkSubmission
-		err   error
-	)
+	var items []repo.HomeworkSubmission
 	if role == auth.RoleParent {
 		items, err = h.manage.ListForParent(r.Context(), uid, status, limit)
 	} else {
@@ -182,8 +183,8 @@ func (h *HomeworkHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req patchStatusReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
 		return
 	}
 	req.Status = strings.TrimSpace(req.Status)

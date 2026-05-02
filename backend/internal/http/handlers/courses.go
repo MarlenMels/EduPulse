@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -35,12 +34,6 @@ type updateLessonReq struct {
 	SortOrder   int    `json:"sort_order" example:"1"`
 }
 
-type lessonAssetReq struct {
-	Type             string `json:"type"`
-	URL              string `json:"url"`
-	OriginalFilename string `json:"original_filename"`
-}
-
 type CourseHandler struct {
 	svc *service.CourseService
 }
@@ -63,30 +56,46 @@ func NewCourseHandler(svc *service.CourseService) *CourseHandler {
 // @Router       /courses [post]
 func (h *CourseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createCourseReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
 		return
 	}
-	req.Title = strings.TrimSpace(req.Title)
-	if msg := validateCourseInput(req); msg != "" {
-		writeError(w, http.StatusBadRequest, msg)
+	title, err := normalizeRequiredText(req.Title, "title", 120)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	description, err := normalizeOptionalText(req.Description, 500)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "description must be 500 characters or less")
+		return
+	}
+	imageURL, err := normalizeOptionalText(req.ImageURL, 255)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "image_url must be 255 characters or less")
 		return
 	}
 
 	lessons := make([]repo.Lesson, 0, len(req.Lessons))
 	for _, l := range req.Lessons {
-		lesson, msg := lessonFromInput(l, 0, 0)
-		if msg != "" {
-			writeError(w, http.StatusBadRequest, msg)
+		lessonTitle, err := normalizeRequiredText(l.Title, "lesson title", 120)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		lessons = append(lessons, lesson)
+		lessons = append(lessons, repo.Lesson{
+			Title:       lessonTitle,
+			Description: strings.TrimSpace(l.Description),
+			VideoURL:    strings.TrimSpace(l.VideoURL),
+			FileURL:     strings.TrimSpace(l.FileURL),
+			SortOrder:   l.SortOrder,
+		})
 	}
 
 	result, err := h.svc.CreateWithLessons(r.Context(), repo.Course{
-		Title:       req.Title,
-		Description: strings.TrimSpace(req.Description),
-		ImageURL:    strings.TrimSpace(req.ImageURL),
+		Title:       title,
+		Description: description,
+		ImageURL:    imageURL,
 	}, lessons)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -116,18 +125,24 @@ func (h *CourseHandler) AddLesson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req lessonInput
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
+		return
+	}
+	title, err := normalizeRequiredText(req.Title, "title", 120)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	lesson, msg := lessonFromInput(req, 0, courseID)
-	if msg != "" {
-		writeError(w, http.StatusBadRequest, msg)
-		return
-	}
-
-	l, err := h.svc.AddLesson(r.Context(), lesson)
+	l, err := h.svc.AddLesson(r.Context(), repo.Lesson{
+		CourseID:    courseID,
+		Title:       title,
+		Description: strings.TrimSpace(req.Description),
+		VideoURL:    strings.TrimSpace(req.VideoURL),
+		FileURL:     strings.TrimSpace(req.FileURL),
+		SortOrder:   req.SortOrder,
+	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -158,24 +173,25 @@ func (h *CourseHandler) UpdateLesson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req updateLessonReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
+		return
+	}
+	title, err := normalizeRequiredText(req.Title, "title", 120)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	lesson, msg := lessonFromInput(lessonInput{
-		Title:       req.Title,
-		Description: req.Description,
-		VideoURL:    req.VideoURL,
-		FileURL:     req.FileURL,
+	l, err := h.svc.UpdateLesson(r.Context(), repo.Lesson{
+		ID:          lessonID,
+		CourseID:    courseID,
+		Title:       title,
+		Description: strings.TrimSpace(req.Description),
+		VideoURL:    strings.TrimSpace(req.VideoURL),
+		FileURL:     strings.TrimSpace(req.FileURL),
 		SortOrder:   req.SortOrder,
-	}, lessonID, courseID)
-	if msg != "" {
-		writeError(w, http.StatusBadRequest, msg)
-		return
-	}
-
-	l, err := h.svc.UpdateLesson(r.Context(), lesson)
+	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -194,14 +210,18 @@ func (h *CourseHandler) UpdateLesson(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {object}  errorResponse
 // @Router       /courses [get]
 func (h *CourseHandler) List(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
+	limit, err := parseLimitParam(r, 50)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	search, err := normalizeSearchQuery(r.URL.Query().Get("search"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
-	courses, err := h.svc.List(r.Context(), limit)
+	courses, err := h.svc.List(r.Context(), limit, search)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db error")
 		return
@@ -212,135 +232,21 @@ func (h *CourseHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Stubs for routes wired up in server.go but whose handlers haven't been
+// implemented yet. They return 501 so the build stays green and the feature
+// surface is obvious to the next caller.
 func (h *CourseHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if id <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid course id")
-		return
-	}
-	if err := h.svc.Delete(r.Context(), id); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	writeError(w, http.StatusNotImplemented, "course delete not implemented")
 }
 
 func (h *CourseHandler) DeleteLesson(w http.ResponseWriter, r *http.Request) {
-	courseID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
-	if courseID <= 0 || lessonID <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	if err := h.svc.DeleteLesson(r.Context(), courseID, lessonID); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	writeError(w, http.StatusNotImplemented, "lesson delete not implemented")
 }
 
 func (h *CourseHandler) AddLessonAsset(w http.ResponseWriter, r *http.Request) {
-	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
-	if lessonID <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid lesson id")
-		return
-	}
-	var req lessonAssetReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
-		return
-	}
-	asset, err := h.svc.AddLessonAsset(r.Context(), repo.LessonAsset{
-		LessonID:         lessonID,
-		Type:             req.Type,
-		URL:              req.URL,
-		OriginalFilename: req.OriginalFilename,
-	})
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusCreated, asset)
+	writeError(w, http.StatusNotImplemented, "lesson asset upload not implemented")
 }
 
 func (h *CourseHandler) DeleteLessonAsset(w http.ResponseWriter, r *http.Request) {
-	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "lessonId"), 10, 64)
-	assetID, _ := strconv.ParseInt(chi.URLParam(r, "assetId"), 10, 64)
-	if lessonID <= 0 || assetID <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	if err := h.svc.DeleteLessonAsset(r.Context(), lessonID, assetID); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func validateCourseInput(req createCourseReq) string {
-	if req.Title == "" {
-		return "title is required"
-	}
-	if len(req.Title) > 120 {
-		return "title must be 120 characters or less"
-	}
-	if len(strings.TrimSpace(req.Description)) > 2000 {
-		return "description must be 2000 characters or less"
-	}
-	if !validOptionalResourceURL(req.ImageURL) {
-		return "image_url must be a valid http(s) URL or local path"
-	}
-	return ""
-}
-
-func lessonFromInput(input lessonInput, lessonID, courseID int64) (repo.Lesson, string) {
-	title := strings.TrimSpace(input.Title)
-	description := strings.TrimSpace(input.Description)
-	videoURL := strings.TrimSpace(input.VideoURL)
-	fileURL := strings.TrimSpace(input.FileURL)
-
-	if title == "" {
-		return repo.Lesson{}, "lesson title is required"
-	}
-	if len(title) > 120 {
-		return repo.Lesson{}, "lesson title must be 120 characters or less"
-	}
-	if len(description) > 2000 {
-		return repo.Lesson{}, "lesson description must be 2000 characters or less"
-	}
-	if input.SortOrder < 0 {
-		return repo.Lesson{}, "sort_order cannot be negative"
-	}
-	if !validOptionalResourceURL(videoURL) {
-		return repo.Lesson{}, "video_url must be a valid http(s) URL or local path"
-	}
-	if !validOptionalResourceURL(fileURL) {
-		return repo.Lesson{}, "file_url must be a valid http(s) URL or local path"
-	}
-
-	return repo.Lesson{
-		ID:          lessonID,
-		CourseID:    courseID,
-		Title:       title,
-		Description: description,
-		VideoURL:    videoURL,
-		FileURL:     fileURL,
-		SortOrder:   input.SortOrder,
-	}, ""
-}
-
-func validOptionalResourceURL(raw string) bool {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return true
-	}
-	if strings.HasPrefix(value, "/") && !strings.HasPrefix(value, "//") {
-		return true
-	}
-
-	parsed, err := url.ParseRequestURI(value)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return false
-	}
-	return parsed.Scheme == "http" || parsed.Scheme == "https"
+	writeError(w, http.StatusNotImplemented, "lesson asset delete not implemented")
 }

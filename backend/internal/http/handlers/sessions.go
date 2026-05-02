@@ -48,7 +48,7 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	role, _ := middleware.RoleFromContext(r.Context())
 
 	var req createSessionReq
-	if err := decodeJSON(r, &req); err != nil {
+	if err := decodeJSON(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json body")
 		return
 	}

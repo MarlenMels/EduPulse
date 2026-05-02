@@ -12,14 +12,14 @@ func NewSessionRepo(db *sql.DB) *SessionRepo { return &SessionRepo{db: db} }
 
 func (r *SessionRepo) Create(ctx context.Context, s Session) (Session, error) {
 	created := time.Now().UTC().Format(time.RFC3339)
-	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO sessions (teacher_id, title, start_time, created_at) VALUES (?, ?, ?, ?)",
+	var id int64
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO sessions (teacher_id, title, start_time, created_at) VALUES ($1, $2, $3, $4) RETURNING id",
 		s.TeacherID, s.Title, s.StartTime.UTC().Format(time.RFC3339), created,
-	)
+	).Scan(&id)
 	if err != nil {
 		return Session{}, err
 	}
-	id, _ := res.LastInsertId()
 	s.ID = id
 	s.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	return s, nil
@@ -30,7 +30,7 @@ func (r *SessionRepo) List(ctx context.Context, limit int) ([]Session, error) {
 		limit = 50
 	}
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, teacher_id, title, start_time, created_at FROM sessions ORDER BY start_time DESC LIMIT ?",
+		"SELECT id, teacher_id, title, start_time, created_at FROM sessions ORDER BY start_time DESC LIMIT $1",
 		limit,
 	)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *SessionRepo) List(ctx context.Context, limit int) ([]Session, error) {
 
 func (r *SessionRepo) GetByID(ctx context.Context, id int64) (*Session, error) {
 	row := r.db.QueryRowContext(ctx,
-		"SELECT id, teacher_id, title, start_time, created_at FROM sessions WHERE id = ?",
+		"SELECT id, teacher_id, title, start_time, created_at FROM sessions WHERE id = $1",
 		id,
 	)
 	var s Session

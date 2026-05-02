@@ -12,16 +12,17 @@ func NewVideoRepo(db *sql.DB) *VideoRepo { return &VideoRepo{db: db} }
 
 func (r *VideoRepo) Create(ctx context.Context, u VideoUpload) (VideoUpload, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := r.db.ExecContext(ctx,
+	var id int64
+	err := r.db.QueryRowContext(ctx,
 		`INSERT INTO video_uploads
 			(lesson_id, original_filename, stored_path, hls_path, status, error_message, created_at, finished_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
 		u.LessonID, u.OriginalFilename, u.StoredPath, u.HLSPath, u.Status, u.ErrorMessage, now, "",
-	)
+	).Scan(&id)
 	if err != nil {
 		return VideoUpload{}, err
 	}
-	u.ID, _ = res.LastInsertId()
+	u.ID = id
 	u.CreatedAt, _ = time.Parse(time.RFC3339, now)
 	return u, nil
 }
@@ -30,8 +31,8 @@ func (r *VideoRepo) UpdateStatus(ctx context.Context, id int64, status, hlsPath,
 	finished := time.Now().UTC().Format(time.RFC3339)
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE video_uploads
-		   SET status = ?, hls_path = ?, error_message = ?, finished_at = ?
-		 WHERE id = ?`,
+		   SET status = $1, hls_path = $2, error_message = $3, finished_at = $4
+		 WHERE id = $5`,
 		status, hlsPath, errMsg, finished, id,
 	)
 	return err
@@ -41,7 +42,7 @@ func (r *VideoRepo) GetByLesson(ctx context.Context, lessonID int64) (*VideoUplo
 	row := r.db.QueryRowContext(ctx,
 		`SELECT id, lesson_id, original_filename, stored_path, hls_path, status, error_message, created_at, finished_at
 		   FROM video_uploads
-		  WHERE lesson_id = ?
+		  WHERE lesson_id = $1
 		  ORDER BY id DESC
 		  LIMIT 1`, lessonID,
 	)

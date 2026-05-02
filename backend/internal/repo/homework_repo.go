@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -12,14 +13,14 @@ func NewHomeworkRepo(db *sql.DB) *HomeworkRepo { return &HomeworkRepo{db: db} }
 
 func (r *HomeworkRepo) Create(ctx context.Context, h HomeworkSubmission) (HomeworkSubmission, error) {
 	created := time.Now().UTC().Format(time.RFC3339)
-	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO homework_submissions (session_id, student_id, content, status, created_at) VALUES (?, ?, ?, ?, ?)",
+	var id int64
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO homework_submissions (session_id, student_id, content, status, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 		h.SessionID, h.StudentID, h.Content, h.Status, created,
-	)
+	).Scan(&id)
 	if err != nil {
 		return HomeworkSubmission{}, err
 	}
-	id, _ := res.LastInsertId()
 	h.ID = id
 	h.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	return h, nil
@@ -27,7 +28,7 @@ func (r *HomeworkRepo) Create(ctx context.Context, h HomeworkSubmission) (Homewo
 
 func (r *HomeworkRepo) GetByID(ctx context.Context, id int64) (*HomeworkSubmission, error) {
 	row := r.db.QueryRowContext(ctx,
-		"SELECT id, session_id, student_id, content, status, created_at FROM homework_submissions WHERE id = ?",
+		"SELECT id, session_id, student_id, content, status, created_at FROM homework_submissions WHERE id = $1",
 		id,
 	)
 	var h HomeworkSubmission
@@ -43,7 +44,7 @@ func (r *HomeworkRepo) GetByID(ctx context.Context, id int64) (*HomeworkSubmissi
 }
 
 func (r *HomeworkRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
-	_, err := r.db.ExecContext(ctx, "UPDATE homework_submissions SET status = ? WHERE id = ?", status, id)
+	_, err := r.db.ExecContext(ctx, "UPDATE homework_submissions SET status = $1 WHERE id = $2", status, id)
 	return err
 }
 
@@ -63,29 +64,31 @@ func (r *HomeworkRepo) List(ctx context.Context, f HomeworkListFilter) ([]Homewo
 	q := "SELECT id, session_id, student_id, content, status, created_at FROM homework_submissions"
 	args := make([]any, 0, 5)
 	where := ""
+	n := 0
+	ph := func() string { n++; return fmt.Sprintf("$%d", n) }
 
 	if f.SessionID > 0 {
-		where += "session_id = ?"
+		where += "session_id = " + ph()
 		args = append(args, f.SessionID)
 	}
 	if f.StudentID > 0 {
 		if where != "" {
 			where += " AND "
 		}
-		where += "student_id = ?"
+		where += "student_id = " + ph()
 		args = append(args, f.StudentID)
 	}
 	if f.Status != "" {
 		if where != "" {
 			where += " AND "
 		}
-		where += "status = ?"
+		where += "status = " + ph()
 		args = append(args, f.Status)
 	}
 	if where != "" {
 		q += " WHERE " + where
 	}
-	q += " ORDER BY id DESC LIMIT ?"
+	q += " ORDER BY id DESC LIMIT " + ph()
 	args = append(args, limit)
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
@@ -116,13 +119,16 @@ func (r *HomeworkRepo) ListForParent(ctx context.Context, parentID int64, status
 		SELECT h.id, h.session_id, h.student_id, h.content, h.status, h.created_at
 		  FROM homework_submissions h
 		  JOIN parent_students ps ON ps.student_id = h.student_id
-		 WHERE ps.parent_id = ?`
+		 WHERE ps.parent_id = $1`
 	args := []any{parentID}
+	n := 1
+	ph := func() string { n++; return fmt.Sprintf("$%d", n) }
+
 	if status != "" {
-		q += " AND h.status = ?"
+		q += " AND h.status = " + ph()
 		args = append(args, status)
 	}
-	q += " ORDER BY h.id DESC LIMIT ?"
+	q += " ORDER BY h.id DESC LIMIT " + ph()
 	args = append(args, limit)
 
 	rows, err := r.db.QueryContext(ctx, q, args...)

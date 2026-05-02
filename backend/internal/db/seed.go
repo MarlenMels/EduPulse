@@ -47,7 +47,7 @@ func Seed(db *sql.DB) error {
 			return err
 		}
 		_, err = tx.ExecContext(ctx,
-			"INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+			"INSERT INTO users (email, password_hash, role, created_at) VALUES ($1, $2, $3, $4)",
 			u.Email, hash, u.Role, now,
 		)
 		if err != nil {

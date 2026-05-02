@@ -68,8 +68,8 @@ func (s *CourseService) DeleteLessonAsset(ctx context.Context, lessonID, assetID
 	return s.repo.DeleteLessonAsset(ctx, lessonID, assetID)
 }
 
-func (s *CourseService) List(ctx context.Context, limit int) ([]CourseWithLessons, error) {
-	courses, err := s.repo.List(ctx, limit)
+func (s *CourseService) List(ctx context.Context, limit int, search string) ([]CourseWithLessons, error) {
+	courses, err := s.repo.List(ctx, limit, search)
 	if err != nil {
 		return nil, err
 	}

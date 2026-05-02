@@ -11,7 +11,7 @@ type UserRepo struct{ db *sql.DB }
 func NewUserRepo(db *sql.DB) *UserRepo { return &UserRepo{db: db} }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*User, error) {
-	row := r.db.QueryRowContext(ctx, "SELECT id, email, password_hash, role, created_at FROM users WHERE email = ?", email)
+	row := r.db.QueryRowContext(ctx, "SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1", email)
 	var u User
 	var created string
 	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &created); err != nil {
@@ -26,7 +26,7 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*User, error) 
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id int64) (*User, error) {
-	row := r.db.QueryRowContext(ctx, "SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?", id)
+	row := r.db.QueryRowContext(ctx, "SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1", id)
 	var u User
 	var created string
 	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &created); err != nil {
@@ -48,7 +48,7 @@ type RoleCount struct {
 
 func (r *UserRepo) UpdateLastSeen(ctx context.Context, id int64) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = r.db.ExecContext(ctx, "UPDATE users SET last_seen_at = ? WHERE id = ?", now, id)
+	_, _ = r.db.ExecContext(ctx, "UPDATE users SET last_seen_at = $1 WHERE id = $2", now, id)
 }
 
 func (r *UserRepo) Stats(ctx context.Context) ([]RoleCount, error) {
@@ -56,7 +56,7 @@ func (r *UserRepo) Stats(ctx context.Context) ([]RoleCount, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT role,
 		       COUNT(*) AS total,
-		       SUM(CASE WHEN last_seen_at > ? THEN 1 ELSE 0 END) AS online
+		       SUM(CASE WHEN last_seen_at > $1 THEN 1 ELSE 0 END) AS online
 		FROM users
 		GROUP BY role
 		ORDER BY role
@@ -79,14 +79,14 @@ func (r *UserRepo) Stats(ctx context.Context) ([]RoleCount, error) {
 
 func (r *UserRepo) Create(ctx context.Context, email, passwordHash, role string) (User, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+	var id int64
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO users (email, password_hash, role, created_at) VALUES ($1, $2, $3, $4) RETURNING id",
 		email, passwordHash, role, now,
-	)
+	).Scan(&id)
 	if err != nil {
 		return User{}, err
 	}
-	id, _ := res.LastInsertId()
 	t, _ := time.Parse(time.RFC3339, now)
 	return User{ID: id, Email: email, Role: role, CreatedAt: t}, nil
 }

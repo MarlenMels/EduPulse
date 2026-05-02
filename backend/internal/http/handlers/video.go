@@ -111,7 +111,7 @@ func (h *VideoHandler) SaveURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req videoURLReq
-	if err := decodeJSON(r, &req); err != nil {
+	if err := decodeJSON(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json body")
 		return
 	}

@@ -13,7 +13,7 @@ func NewAuditRepo(db *sql.DB) *AuditRepo { return &AuditRepo{db: db} }
 func (r *AuditRepo) Create(ctx context.Context, a AuditLog) error {
 	created := time.Now().UTC().Format(time.RFC3339)
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id, meta_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		"INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id, meta_json, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
 		a.ActorUserID, a.Action, a.EntityType, a.EntityID, a.MetaJSON, created,
 	)
 	return err
@@ -24,7 +24,7 @@ func (r *AuditRepo) ListRecent(ctx context.Context, limit int) ([]AuditLog, erro
 		limit = 50
 	}
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, actor_user_id, action, entity_type, entity_id, meta_json, created_at FROM audit_logs ORDER BY id DESC LIMIT ?",
+		"SELECT id, actor_user_id, action, entity_type, entity_id, meta_json, created_at FROM audit_logs ORDER BY id DESC LIMIT $1",
 		limit,
 	)
 	if err != nil {

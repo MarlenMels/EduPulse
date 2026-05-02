@@ -9,11 +9,16 @@ import (
 	"strings"
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/*.sql migrations_pg/*.sql
 var migrationsFS embed.FS
 
-func Migrate(db *sql.DB) error {
-	entries, err := fs.Glob(migrationsFS, "migrations/*.sql")
+func Migrate(db *sql.DB, driver Driver) error {
+	dir := "migrations"
+	if driver == DriverPostgres {
+		dir = "migrations_pg"
+	}
+
+	entries, err := fs.Glob(migrationsFS, dir+"/*.sql")
 	if err != nil {
 		return err
 	}
@@ -29,6 +34,9 @@ func Migrate(db *sql.DB) error {
 			continue
 		}
 		if _, err := db.Exec(sqlText); err != nil {
+			// SQLite ALTER TABLE ADD COLUMN does not support IF NOT EXISTS,
+			// so the same migration applied twice yields "duplicate column".
+			// Postgres uses IF NOT EXISTS and never produces this error.
 			if strings.Contains(err.Error(), "duplicate column") {
 				continue
 			}
