@@ -1,6 +1,5 @@
 <template>
   <div class="user-card" :class="user.role">
-    <!-- avatar shows the first letter of the name -->
     <div class="user-header">
       <div class="avatar">{{ user.name.charAt(0) }}</div>
       <div class="user-info">
@@ -13,9 +12,7 @@
       <p>📧 {{ user.email }}</p>
     </div>
 
-    <!-- action buttons: emit events up to the parent -->
     <div class="actions">
-      <!-- inline $emit — quick way to fire an event right from the template -->
       <button
         @click="$emit('delete', user.id)"
         class="btn-danger"
@@ -23,7 +20,6 @@
         Delete
       </button>
 
-      <!-- calls a handler that emits multiple events at once -->
       <button
         @click="handlePromote"
         class="btn-primary"
@@ -35,9 +31,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-
-// 1. type for the user object we receive as a prop
 interface User {
   id: number
   name: string
@@ -45,15 +38,12 @@ interface User {
   email: string
 }
 
-// 2. props — the parent passes a User object into this component
 interface Props {
   user: User
 }
 
 const props = defineProps<Props>()
 
-// 3. emits — declaring which events this component can send to the parent
-//    tuple syntax: EventName: [param1Type, param2Type, ...]
 interface Emits {
   delete: [userId: number]
   promote: [userId: number]
@@ -62,33 +52,15 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 
-// 4. handler that fires two events when the promote button is clicked
 const handlePromote = () => {
   emit('promote', props.user.id)
 
-  // we can also send extra info through a generic "custom" event
   emit('custom', {
     action: 'promote_attempt',
     userId: props.user.id,
     currentRole: props.user.role
   })
 }
-
-// 5. computed props — cached, only re-evaluated when dependencies change
-const isAdmin = computed(() => props.user.role === 'admin')
-
-const roleColor = computed(() => {
-  switch (props.user.role) {
-    case 'admin': return '#e74c3c'
-    case 'moderator': return '#f39c12'
-    default: return '#3498db'
-  }
-})
-
-// 6. deep watcher — tracks nested changes inside the user object
-watch(() => props.user, (newUser) => {
-  console.log('User updated:', newUser)
-}, { deep: true })
 </script>
 
 <style scoped>

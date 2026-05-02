@@ -64,7 +64,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 type registerReq struct {
 	Email    string `json:"email" example:"user@example.com"`
 	Password string `json:"password" example:"secret123"`
-	Role     string `json:"role" example:"student" enums:"admin,manager,teacher,student,parent"`
+	Role     string `json:"role" example:"student" enums:"student,parent"`
 }
 
 // Register godoc
@@ -101,8 +101,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "password must be at most 72 characters")
 		return
 	}
-	if !auth.IsValidRole(req.Role) {
-		writeError(w, http.StatusBadRequest, "invalid role, must be one of: admin, manager, teacher, student, parent")
+	if req.Role != auth.RoleStudent && req.Role != auth.RoleParent {
+		writeError(w, http.StatusBadRequest, "invalid role, must be one of: student, parent")
 		return
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"edupulse/internal/auth"
 	"edupulse/internal/middleware"
 	"edupulse/internal/repo"
 	"edupulse/internal/service"
@@ -129,7 +130,16 @@ func (h *HomeworkHandler) Mine(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items, err := h.manage.ListMine(r.Context(), uid, status, limit)
+	role, _ := middleware.RoleFromContext(r.Context())
+	var (
+		items []repo.HomeworkSubmission
+		err   error
+	)
+	if role == auth.RoleParent {
+		items, err = h.manage.ListForParent(r.Context(), uid, status, limit)
+	} else {
+		items, err = h.manage.ListMine(r.Context(), uid, status, limit)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

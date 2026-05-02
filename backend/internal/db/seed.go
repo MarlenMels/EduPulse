@@ -55,5 +55,15 @@ func Seed(db *sql.DB) error {
 		}
 	}
 
+	_, err = tx.ExecContext(ctx, `
+		INSERT OR IGNORE INTO parent_students (parent_id, student_id, created_at)
+		SELECT p.id, s.id, ?
+		  FROM users p, users s
+		 WHERE p.email = ? AND s.email = ?
+	`, now, "parent@edupulse.local", "student@edupulse.local")
+	if err != nil {
+		return err
+	}
+
 	return tx.Commit()
 }

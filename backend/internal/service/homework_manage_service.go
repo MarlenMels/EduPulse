@@ -34,6 +34,13 @@ func (s *HomeworkManageService) ListMine(ctx context.Context, studentID int64, s
 	})
 }
 
+func (s *HomeworkManageService) ListForParent(ctx context.Context, parentID int64, status string, limit int) ([]repo.HomeworkSubmission, error) {
+	if parentID <= 0 {
+		return nil, fmt.Errorf("invalid parent id")
+	}
+	return s.hw.ListForParent(ctx, parentID, status, limit)
+}
+
 func (s *HomeworkManageService) UpdateStatus(ctx context.Context, actorTeacherID int64, submissionID int64, newStatus string) (*repo.HomeworkSubmission, error) {
 	if submissionID <= 0 {
 		return nil, fmt.Errorf("invalid id")
@@ -59,10 +66,10 @@ func (s *HomeworkManageService) UpdateStatus(ctx context.Context, actorTeacherID
 
 	// audit: grade_homework
 	_ = s.audit.Log(ctx, actorTeacherID, "grade_homework", "homework_submission", submissionID, map[string]any{
-		"session_id":  cur.SessionID,
-		"student_id":  cur.StudentID,
-		"old_status":  old,
-		"new_status":  newStatus,
+		"session_id": cur.SessionID,
+		"student_id": cur.StudentID,
+		"old_status": old,
+		"new_status": newStatus,
 	})
 
 	// event: homework_graded

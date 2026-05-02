@@ -66,19 +66,13 @@ function navigateTo(path: string) {
 
 <template>
   <div class="flex min-h-screen bg-[#121212]">
-    <!-- Sidebar (desktop) -->
     <aside class="hidden lg:flex flex-col w-64 bg-[#1E1E1E] border-r border-white/5">
-      <!-- Logo -->
-      <div class="flex items-center gap-3 px-6 py-5 border-b border-white/5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-          <span class="text-black font-extrabold text-sm">EP</span>
-        </div>
+      <div class="flex items-center px-6 py-5 border-b border-white/5">
         <span class="text-lg font-extrabold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
           EDpulse
         </span>
       </div>
 
-      <!-- Nav -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <button
           v-for="item in visibleNavItems"
@@ -96,7 +90,6 @@ function navigateTo(path: string) {
         </button>
       </nav>
 
-      <!-- User section -->
       <div class="px-3 py-4 border-t border-white/5">
         <div class="flex items-center gap-3 px-4 py-3">
           <div class="w-9 h-9 rounded-full bg-cyan-400/20 flex items-center justify-center shrink-0">
@@ -117,13 +110,9 @@ function navigateTo(path: string) {
       </div>
     </aside>
 
-    <!-- Mobile header -->
     <div class="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#1E1E1E] border-b border-white/5">
       <div class="flex items-center justify-between px-4 py-3">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-            <span class="text-black font-extrabold text-xs">EP</span>
-          </div>
+        <div class="flex items-center">
           <span class="font-extrabold text-cyan-400">EDpulse</span>
         </div>
         <button @click="sidebarOpen = !sidebarOpen" class="text-white/60 hover:text-white p-2">
@@ -133,7 +122,6 @@ function navigateTo(path: string) {
       </div>
     </div>
 
-    <!-- Mobile sidebar overlay -->
     <Transition name="fade">
       <div
         v-if="sidebarOpen"
@@ -142,7 +130,6 @@ function navigateTo(path: string) {
       />
     </Transition>
 
-    <!-- Mobile sidebar -->
     <Transition name="slide">
       <aside
         v-if="sidebarOpen"
@@ -176,7 +163,6 @@ function navigateTo(path: string) {
       </aside>
     </Transition>
 
-    <!-- Main content -->
     <main class="flex-1 lg:ml-0 mt-14 lg:mt-0 overflow-y-auto">
       <div class="p-4 md:p-6 lg:p-8">
         <RouterView />

@@ -76,9 +76,6 @@ func CheckFFmpeg() error {
 }
 
 func (s *VideoService) SaveAndConvert(ctx context.Context, lessonID, userID int64, file multipart.File, header *multipart.FileHeader) (repo.VideoUpload, error) {
-	if !s.ffmpegAvailable {
-		return repo.VideoUpload{}, ErrFFmpegUnavailable
-	}
 	if header.Size <= 0 || header.Size > s.maxSize {
 		return repo.VideoUpload{}, ErrFileTooLarge
 	}
@@ -91,8 +88,9 @@ func (s *VideoService) SaveAndConvert(ctx context.Context, lessonID, userID int6
 		return repo.VideoUpload{}, err
 	}
 
-	uniqueName := fmt.Sprintf("lesson_%d_%d.mp4", lessonID, time.Now().Unix())
+	uniqueName := fmt.Sprintf("lesson_%d_%d%s", lessonID, time.Now().UnixNano(), ext)
 	storedPath := filepath.Join(s.videoDir, uniqueName)
+	videoURL := "/videos/" + uniqueName
 
 	dst, err := os.Create(storedPath)
 	if err != nil {
@@ -109,11 +107,38 @@ func (s *VideoService) SaveAndConvert(ctx context.Context, lessonID, userID int6
 		LessonID:         lessonID,
 		OriginalFilename: header.Filename,
 		StoredPath:       storedPath,
+		HLSPath:          "",
 		Status:           "processing",
 	})
 	if err != nil {
 		_ = os.Remove(storedPath)
 		return repo.VideoUpload{}, err
+	}
+
+	if !s.ffmpegAvailable {
+		if err := s.uploads.UpdateStatus(ctx, upload.ID, "ready", videoURL, ""); err != nil {
+			return repo.VideoUpload{}, err
+		}
+		if err := s.courses.UpdateVideoStatus(ctx, lessonID, "ready", videoURL); err != nil {
+			log.Printf("video: lesson %d status update failed: %v", lessonID, err)
+		}
+		upload.Status = "ready"
+		upload.HLSPath = videoURL
+		if s.audit != nil {
+			_ = s.audit.Log(ctx, userID, "video.upload", "lesson", lessonID, map[string]any{
+				"upload_id": upload.ID,
+				"filename":  header.Filename,
+				"size":      header.Size,
+				"url":       videoURL,
+			})
+		}
+		_, _ = s.courses.CreateLessonAsset(ctx, repo.LessonAsset{
+			LessonID:         lessonID,
+			Type:             "video",
+			URL:              videoURL,
+			OriginalFilename: header.Filename,
+		})
+		return upload, nil
 	}
 
 	if err := s.courses.UpdateVideoStatus(ctx, lessonID, "processing", ""); err != nil {
@@ -131,14 +156,15 @@ func (s *VideoService) SaveAndConvert(ctx context.Context, lessonID, userID int6
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.convertToHLS(upload.ID, lessonID, userID, storedPath)
+		s.convertToHLS(upload.ID, lessonID, userID, storedPath, header.Filename)
 	}()
 
 	return upload, nil
 }
 
-func (s *VideoService) convertToHLS(uploadID, lessonID, userID int64, srcPath string) {
-	outDir := filepath.Join(s.hlsDir, fmt.Sprintf("lesson_%d", lessonID))
+func (s *VideoService) convertToHLS(uploadID, lessonID, userID int64, srcPath, originalFilename string) {
+	outDirName := fmt.Sprintf("lesson_%d_upload_%d", lessonID, uploadID)
+	outDir := filepath.Join(s.hlsDir, outDirName)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		s.markFailed(uploadID, lessonID, userID, err.Error())
 		return
@@ -171,7 +197,7 @@ func (s *VideoService) convertToHLS(uploadID, lessonID, userID int64, srcPath st
 		return
 	}
 
-	hlsURL := fmt.Sprintf("/hls/lesson_%d/playlist.m3u8", lessonID)
+	hlsURL := fmt.Sprintf("/hls/%s/playlist.m3u8", outDirName)
 
 	bg := context.Background()
 	if err := s.uploads.UpdateStatus(bg, uploadID, "ready", hlsURL, ""); err != nil {
@@ -179,6 +205,14 @@ func (s *VideoService) convertToHLS(uploadID, lessonID, userID int64, srcPath st
 	}
 	if err := s.courses.UpdateVideoStatus(bg, lessonID, "ready", hlsURL); err != nil {
 		log.Printf("video: lesson %d status update failed: %v", lessonID, err)
+	}
+	if _, err := s.courses.CreateLessonAsset(bg, repo.LessonAsset{
+		LessonID:         lessonID,
+		Type:             "video",
+		URL:              hlsURL,
+		OriginalFilename: originalFilename,
+	}); err != nil {
+		log.Printf("video: lesson %d asset create failed: %v", lessonID, err)
 	}
 	if s.audit != nil {
 		_ = s.audit.Log(bg, userID, "video.ready", "lesson", lessonID, map[string]any{
@@ -202,4 +236,56 @@ func (s *VideoService) markFailed(uploadID, lessonID, userID int64, errMsg strin
 
 func (s *VideoService) GetStatus(ctx context.Context, lessonID int64) (*repo.VideoUpload, error) {
 	return s.uploads.GetByLesson(ctx, lessonID)
+}
+
+func (s *VideoService) Clear(ctx context.Context, lessonID, userID int64) error {
+	if lessonID <= 0 {
+		return errors.New("invalid lesson id")
+	}
+	if err := s.courses.ClearVideo(ctx, lessonID); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		_ = s.audit.Log(ctx, userID, "video.clear", "lesson", lessonID, map[string]any{})
+	}
+	return nil
+}
+
+func (s *VideoService) SaveExternalURL(ctx context.Context, lessonID, userID int64, url, originalFilename string) (repo.VideoUpload, error) {
+	if strings.TrimSpace(url) == "" {
+		return repo.VideoUpload{}, errors.New("url is required")
+	}
+
+	upload, err := s.uploads.Create(ctx, repo.VideoUpload{
+		LessonID:         lessonID,
+		OriginalFilename: originalFilename,
+		StoredPath:       url,
+		HLSPath:          url,
+		Status:           "ready",
+	})
+	if err != nil {
+		return repo.VideoUpload{}, err
+	}
+	if err := s.uploads.UpdateStatus(ctx, upload.ID, "ready", url, ""); err != nil {
+		return repo.VideoUpload{}, err
+	}
+	if err := s.courses.UpdateVideoStatus(ctx, lessonID, "ready", url); err != nil {
+		return repo.VideoUpload{}, err
+	}
+	upload.Status = "ready"
+	upload.HLSPath = url
+
+	if s.audit != nil {
+		_ = s.audit.Log(ctx, userID, "video.blob", "lesson", lessonID, map[string]any{
+			"upload_id": upload.ID,
+			"url":       url,
+		})
+	}
+	_, _ = s.courses.CreateLessonAsset(ctx, repo.LessonAsset{
+		LessonID:         lessonID,
+		Type:             "video",
+		URL:              url,
+		OriginalFilename: originalFilename,
+	})
+	return upload, nil
 }

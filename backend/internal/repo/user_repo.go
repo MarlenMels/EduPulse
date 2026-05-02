@@ -90,3 +90,8 @@ func (r *UserRepo) Create(ctx context.Context, email, passwordHash, role string)
 	t, _ := time.Parse(time.RFC3339, now)
 	return User{ID: id, Email: email, Role: role, CreatedAt: t}, nil
 }
+
+func (r *UserRepo) UpdatePassword(ctx context.Context, id int64, passwordHash string) error {
+	_, err := r.db.ExecContext(ctx, "UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, id)
+	return err
+}

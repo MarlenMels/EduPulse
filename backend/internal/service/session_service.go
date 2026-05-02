@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"edupulse/internal/auth"
@@ -26,8 +27,12 @@ type CreateSessionInput struct {
 }
 
 func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSessionInput) (repo.Session, error) {
+	in.Title = strings.TrimSpace(in.Title)
 	if in.Title == "" {
 		return repo.Session{}, errors.New("title is required")
+	}
+	if len(in.Title) > 120 {
+		return repo.Session{}, errors.New("title must be 120 characters or less")
 	}
 	if in.StartTime.IsZero() {
 		return repo.Session{}, errors.New("start_time is required")
@@ -61,4 +66,15 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 
 func (s *SessionService) List(ctx context.Context, limit int) ([]repo.Session, error) {
 	return s.repo.List(ctx, limit)
+}
+
+func (s *SessionService) Delete(ctx context.Context, actorID, sessionID int64) error {
+	if sessionID <= 0 {
+		return errors.New("invalid session id")
+	}
+	if err := s.repo.Delete(ctx, sessionID); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, actorID, "delete_session", "session", sessionID, map[string]any{})
+	return nil
 }

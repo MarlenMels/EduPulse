@@ -2,38 +2,20 @@
   <div class="simple-card" :class="{ important: isImportant }">
     <h3>{{ title }}</h3>
     <p>{{ content }}</p>
-    <!-- show a badge only when isImportant is true -->
     <span v-if="isImportant" class="badge">⭐ Important</span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-
-// defining the shape of props this component accepts
 interface Props {
-  title: string         // required
-  content?: string      // optional, has a default
-  isImportant?: boolean // optional, defaults to false
+  title: string
+  content?: string
+  isImportant?: boolean
 }
 
-// withDefaults lets us set fallback values for optional props
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   content: 'Default content',
   isImportant: false
-})
-
-// we can access props right in <script setup> — runs once on mount
-console.log('Card title:', props.title)
-
-// computed property — recalculates automatically when props change
-const cardType = computed(() => {
-  return props.isImportant ? 'important' : 'regular'
-})
-
-// watcher — fires every time props.title changes
-watch(() => props.title, (newTitle) => {
-  console.log('Title changed to:', newTitle)
 })
 </script>
 

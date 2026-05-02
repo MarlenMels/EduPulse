@@ -17,7 +17,7 @@ async function fetchHomework() {
   loading.value = true
   error.value = ''
   try {
-    if (auth.isStudent) {
+    if (auth.isStudent || auth.isParent) {
       const res = await homeworkApi.mine({ limit: 50 })
       homework.value = res.data.items || []
     } else {
@@ -58,8 +58,11 @@ async function updateStatus(id: number, status: string) {
 function statusColor(status: string) {
   switch (status) {
     case 'approved': return 'text-green-400 bg-green-400/10'
+    case 'accepted': return 'text-green-400 bg-green-400/10'
     case 'rejected': return 'text-red-400 bg-red-400/10'
     case 'pending': return 'text-yellow-400 bg-yellow-400/10'
+    case 'submitted': return 'text-yellow-400 bg-yellow-400/10'
+    case 'needs_fix': return 'text-orange-400 bg-orange-400/10'
     default: return 'text-white/40 bg-white/5'
   }
 }
@@ -67,8 +70,11 @@ function statusColor(status: string) {
 function statusLabel(status: string) {
   switch (status) {
     case 'approved': return 'Approved'
+    case 'accepted': return 'Accepted'
     case 'rejected': return 'Rejected'
     case 'pending': return 'Pending'
+    case 'submitted': return 'Submitted'
+    case 'needs_fix': return 'Needs Fix'
     default: return status
   }
 }
@@ -126,9 +132,9 @@ onMounted(fetchHomework)
           </div>
 
           <!-- Teacher actions -->
-          <div v-if="auth.isTeacher && hw.status === 'pending'" class="flex gap-2 shrink-0">
+          <div v-if="auth.isTeacher && (hw.status === 'pending' || hw.status === 'submitted')" class="flex gap-2 shrink-0">
             <button
-              @click="updateStatus(hw.id, 'approved')"
+              @click="updateStatus(hw.id, 'accepted')"
               class="w-9 h-9 rounded-lg bg-green-400/10 flex items-center justify-center hover:bg-green-400/20 transition-colors"
               title="Approve"
             >

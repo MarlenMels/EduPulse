@@ -127,19 +127,75 @@ func (r *CourseRepo) LessonsByCourse(ctx context.Context, courseID int64) ([]Les
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	out := make([]Lesson, 0, 16)
 	for rows.Next() {
 		var l Lesson
 		var created string
 		if err := rows.Scan(&l.ID, &l.CourseID, &l.Title, &l.Description, &l.VideoURL, &l.FileURL, &l.HLSUrl, &l.VideoStatus, &l.SortOrder, &created); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		l.CreatedAt, _ = time.Parse(time.RFC3339, created)
 		out = append(out, l)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+
+	for i := range out {
+		assets, err := r.AssetsByLesson(ctx, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Assets = assets
+	}
+	return out, nil
+}
+
+func (r *CourseRepo) CreateLessonAsset(ctx context.Context, asset LessonAsset) (LessonAsset, error) {
+	created := time.Now().UTC().Format(time.RFC3339)
+	res, err := r.db.ExecContext(ctx,
+		"INSERT INTO lesson_assets (lesson_id, type, url, original_filename, created_at) VALUES (?, ?, ?, ?, ?)",
+		asset.LessonID, asset.Type, asset.URL, asset.OriginalFilename, created,
+	)
+	if err != nil {
+		return LessonAsset{}, err
+	}
+	asset.ID, _ = res.LastInsertId()
+	asset.CreatedAt, _ = time.Parse(time.RFC3339, created)
+	return asset, nil
+}
+
+func (r *CourseRepo) AssetsByLesson(ctx context.Context, lessonID int64) ([]LessonAsset, error) {
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, lesson_id, type, url, original_filename, created_at FROM lesson_assets WHERE lesson_id = ? ORDER BY id",
+		lessonID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]LessonAsset, 0, 8)
+	for rows.Next() {
+		var asset LessonAsset
+		var created string
+		if err := rows.Scan(&asset.ID, &asset.LessonID, &asset.Type, &asset.URL, &asset.OriginalFilename, &created); err != nil {
+			return nil, err
+		}
+		asset.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, asset)
+	}
 	return out, rows.Err()
+}
+
+func (r *CourseRepo) DeleteLessonAsset(ctx context.Context, lessonID, assetID int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM lesson_assets WHERE id = ? AND lesson_id = ?", assetID, lessonID)
+	return err
 }
 
 func (r *CourseRepo) UpdateVideoStatus(ctx context.Context, lessonID int64, status, hlsURL string) error {
@@ -147,5 +203,23 @@ func (r *CourseRepo) UpdateVideoStatus(ctx context.Context, lessonID int64, stat
 		"UPDATE lessons SET hls_url = ?, video_status = ? WHERE id = ?",
 		hlsURL, status, lessonID,
 	)
+	return err
+}
+
+func (r *CourseRepo) ClearVideo(ctx context.Context, lessonID int64) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE lessons SET video_url = '', hls_url = '', video_status = '' WHERE id = ?",
+		lessonID,
+	)
+	return err
+}
+
+func (r *CourseRepo) Delete(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM courses WHERE id = ?", id)
+	return err
+}
+
+func (r *CourseRepo) DeleteLesson(ctx context.Context, courseID, lessonID int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM lessons WHERE id = ? AND course_id = ?", lessonID, courseID)
 	return err
 }

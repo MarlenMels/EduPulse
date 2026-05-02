@@ -12,26 +12,30 @@ const stats = ref({
   notifications: 0,
 })
 const recentSessions = ref<any[]>([])
-const loading = ref(true)
+const loadingCourses = ref(true)
+const loadingSessions = ref(true)
+const loadingNotifications = ref(auth.isAdmin || auth.isManager)
 
 onMounted(async () => {
-  try {
-    const [courseRes, sessionRes] = await Promise.all([
-      coursesApi.list({ limit: 100 }),
-      sessionsApi.list({ limit: 10 }),
-    ])
+  coursesApi.list({ limit: 100 }).then((courseRes) => {
     stats.value.courses = courseRes.data.count || 0
+  }).finally(() => {
+    loadingCourses.value = false
+  })
+
+  sessionsApi.list({ limit: 10 }).then((sessionRes) => {
     stats.value.sessions = sessionRes.data.count || 0
     recentSessions.value = sessionRes.data.items || []
+  }).finally(() => {
+    loadingSessions.value = false
+  })
 
-    if (auth.isAdmin || auth.isManager) {
-      const notifRes = await notificationsApi.list({ limit: 100 })
+  if (auth.isAdmin || auth.isManager) {
+    notificationsApi.list({ limit: 100 }).then((notifRes) => {
       stats.value.notifications = notifRes.data.count || 0
-    }
-  } catch {
-    // silently fail
-  } finally {
-    loading.value = false
+    }).finally(() => {
+      loadingNotifications.value = false
+    })
   }
 })
 </script>
@@ -53,7 +57,7 @@ onMounted(async () => {
             <GraduationCap class="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <p class="text-2xl font-extrabold text-white">{{ loading ? '...' : stats.courses }}</p>
+            <p class="text-2xl font-extrabold text-white">{{ loadingCourses ? '...' : stats.courses }}</p>
             <p class="text-sm text-white/50">Courses</p>
           </div>
         </div>
@@ -65,7 +69,7 @@ onMounted(async () => {
             <CalendarDays class="w-6 h-6 text-blue-400" />
           </div>
           <div>
-            <p class="text-2xl font-extrabold text-white">{{ loading ? '...' : stats.sessions }}</p>
+            <p class="text-2xl font-extrabold text-white">{{ loadingSessions ? '...' : stats.sessions }}</p>
             <p class="text-sm text-white/50">Sessions</p>
           </div>
         </div>
@@ -80,7 +84,7 @@ onMounted(async () => {
             <Bell class="w-6 h-6 text-purple-400" />
           </div>
           <div>
-            <p class="text-2xl font-extrabold text-white">{{ loading ? '...' : stats.notifications }}</p>
+            <p class="text-2xl font-extrabold text-white">{{ loadingNotifications ? '...' : stats.notifications }}</p>
             <p class="text-sm text-white/50">Notifications</p>
           </div>
         </div>
@@ -96,7 +100,7 @@ onMounted(async () => {
         </h2>
       </div>
 
-      <div v-if="loading" class="p-8 flex justify-center">
+      <div v-if="loadingSessions" class="p-8 flex justify-center">
         <div class="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
       </div>
 

@@ -100,6 +100,7 @@ func NewServer(d Deps) *Server {
 		r.Use(middleware.LastSeen(d.UserRepo))
 
 		userH := handlers.NewUserHandler(d.UserSvc)
+		uploadH := handlers.NewUploadHandler("./uploads")
 		sessionH := handlers.NewSessionHandler(d.SessionSvc, d.SessionReadSvc)
 		hwH := handlers.NewHomeworkHandler(d.HomeworkSvc, d.HomeworkManageSvc)
 		auditH := handlers.NewAuditHandler(d.AuditSvc)
@@ -108,27 +109,38 @@ func NewServer(d Deps) *Server {
 
 		// Profile
 		r.Get("/users/me", userH.Me)
+		r.Patch("/users/me/password", userH.ChangePassword)
+
+		// Uploads
+		r.Post("/uploads", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(uploadH.Create)).ServeHTTP)
 
 		// Sessions
 		r.Post("/sessions", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(sessionH.Create)).ServeHTTP)
 		r.Get("/sessions", sessionH.List)
 		r.Get("/sessions/{id}", sessionH.Get)
+		r.Delete("/sessions/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(sessionH.Delete)).ServeHTTP)
 
 		// Homework
 		r.Post("/homework/submit", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Submit)).ServeHTTP)
 		r.Get("/homework", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher, auth.RoleManager)(http.HandlerFunc(hwH.List)).ServeHTTP)
-		r.Get("/homework/mine", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
+		r.Get("/homework/mine", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent, auth.RoleParent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
 		r.Patch("/homework/{id}/status", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher)(http.HandlerFunc(hwH.UpdateStatus)).ServeHTTP)
 
 		// Courses
 		r.Post("/courses", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.Create)).ServeHTTP)
 		r.Get("/courses", courseH.List)
+		r.Delete("/courses/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.Delete)).ServeHTTP)
 		r.Post("/courses/{id}/lessons", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.AddLesson)).ServeHTTP)
 		r.Put("/courses/{id}/lessons/{lessonId}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.UpdateLesson)).ServeHTTP)
+		r.Delete("/courses/{id}/lessons/{lessonId}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.DeleteLesson)).ServeHTTP)
+		r.Post("/lessons/{lessonId}/assets", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.AddLessonAsset)).ServeHTTP)
+		r.Delete("/lessons/{lessonId}/assets/{assetId}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.DeleteLessonAsset)).ServeHTTP)
 
 		// Lesson videos (HLS)
 		videoH := handlers.NewVideoHandler(d.VideoSvc)
 		r.Post("/lessons/{id}/video", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(videoH.Upload)).ServeHTTP)
+		r.Put("/lessons/{id}/video-url", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(videoH.SaveURL)).ServeHTTP)
+		r.Delete("/lessons/{id}/video", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(videoH.Clear)).ServeHTTP)
 		r.Get("/lessons/{id}/video", videoH.Status)
 
 		// Stats (admin only)

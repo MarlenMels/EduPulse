@@ -69,3 +69,8 @@ func (r *SessionRepo) GetByID(ctx context.Context, id int64) (*Session, error) {
 	s.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	return &s, nil
 }
+
+func (r *SessionRepo) Delete(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM sessions WHERE id = ?", id)
+	return err
+}

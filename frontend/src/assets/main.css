@@ -43,3 +43,84 @@
     background: #555;
   }
 }
+
+@layer base {
+  html.vision-accessible {
+    font-size: 18px;
+  }
+
+  html.vision-accessible body {
+    background: #000000;
+    color: #ffffff;
+  }
+
+  html.vision-accessible button,
+  html.vision-accessible a,
+  html.vision-accessible input,
+  html.vision-accessible select,
+  html.vision-accessible textarea {
+    min-height: 44px;
+  }
+
+  html.vision-accessible button:focus-visible,
+  html.vision-accessible a:focus-visible,
+  html.vision-accessible input:focus-visible,
+  html.vision-accessible select:focus-visible,
+  html.vision-accessible textarea:focus-visible {
+    outline: 3px solid #ffff00;
+    outline-offset: 3px;
+  }
+
+  html.vision-accessible [class*="bg-[#121212]"],
+  html.vision-accessible [class*="bg-[#1E1E1E]"],
+  html.vision-accessible [class*="bg-[#252525]"],
+  html.vision-accessible [class*="bg-[#2D2D2D]"],
+  html.vision-accessible [class*="from-[#121212]"],
+  html.vision-accessible [class*="via-[#1E1E1E]"],
+  html.vision-accessible [class*="to-[#121212]"] {
+    background: #000000 !important;
+  }
+
+  html.vision-accessible [class*="border-white/5"],
+  html.vision-accessible [class*="border-white/10"],
+  html.vision-accessible [class*="border-transparent"] {
+    border-color: #ffffff !important;
+  }
+
+  html.vision-accessible [class*="text-white/20"],
+  html.vision-accessible [class*="text-white/30"],
+  html.vision-accessible [class*="text-white/40"],
+  html.vision-accessible [class*="text-white/50"],
+  html.vision-accessible [class*="text-white/60"],
+  html.vision-accessible [class*="text-white/70"],
+  html.vision-accessible [class*="text-[#8E8E93]"],
+  html.vision-accessible [class*="text-[#B0B0B0]"] {
+    color: #ffffff !important;
+  }
+
+  html.vision-accessible [class*="text-cyan-400"],
+  html.vision-accessible [class*="text-[#0A84FF]"],
+  html.vision-accessible [class*="text-blue-400"] {
+    color: #ffff00 !important;
+  }
+
+  html.vision-accessible [class*="bg-cyan-400"],
+  html.vision-accessible [class*="bg-[#0A84FF]"],
+  html.vision-accessible .vision-toggle.active {
+    background: #ffff00 !important;
+    color: #000000 !important;
+  }
+
+  html.vision-accessible input,
+  html.vision-accessible select,
+  html.vision-accessible textarea {
+    background: #000000 !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+  }
+
+  html.vision-accessible input::placeholder,
+  html.vision-accessible textarea::placeholder {
+    color: #d0d0d0 !important;
+  }
+}

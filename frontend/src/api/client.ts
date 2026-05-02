@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { upload as uploadBlob } from '@vercel/blob/client'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -7,6 +8,60 @@ const api = axios.create({
     'Accept': 'application/json',
   },
 })
+
+const apiBaseURL = import.meta.env.VITE_API_URL || '/api'
+
+export function resolveMediaUrl(src: string) {
+  if (!src || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('blob:')) {
+    return src
+  }
+  if (!src.startsWith('/')) {
+    return src
+  }
+  if (apiBaseURL === '/api') {
+    return `/api${src}`
+  }
+  return `${apiBaseURL.replace(/\/$/, '')}${src}`
+}
+
+export function isVercelBlobUrl(src: string) {
+  try {
+    const url = new URL(src)
+    return url.hostname.endsWith('.vercel-storage.com')
+  } catch {
+    return false
+  }
+}
+
+function isLocalHost() {
+  if (typeof window === 'undefined') return false
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+}
+
+function canUseBlobServerlessApi() {
+  if (typeof window === 'undefined') return false
+  if (import.meta.env.VITE_ENABLE_LOCAL_BLOB_API === 'true') return true
+  return window.location.hostname.endsWith('.vercel.app')
+}
+
+export async function deleteBlobFile(url: string) {
+  if (!canUseBlobServerlessApi()) return false
+  const token = localStorage.getItem('token') || ''
+  await fetch('/api/blob-delete', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ url }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'Failed to delete file')
+    }
+  })
+  return true
+}
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
@@ -29,6 +84,31 @@ api.interceptors.response.use(
 
 export default api
 
+function shouldUseBlobUploads() {
+  if (isLocalHost() && import.meta.env.VITE_ENABLE_LOCAL_BLOB_API !== 'true') return false
+  if (import.meta.env.VITE_USE_VERCEL_BLOB === 'true') return true
+  return typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')
+}
+
+function blobPath(prefix: 'videos' | 'materials', file: File) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  return `edupulse/${prefix}/${Date.now()}-${safeName}`
+}
+
+async function uploadToBlob(prefix: 'videos' | 'materials', file: File, onProgress?: (pct: number) => void) {
+  const token = localStorage.getItem('token') || ''
+  const blob = await uploadBlob(blobPath(prefix, file), file, {
+    access: 'public',
+    handleUploadUrl: '/api/blob-upload',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    multipart: file.size > 8 * 1024 * 1024,
+    onUploadProgress: (event) => {
+      if (onProgress) onProgress(Math.round(event.percentage))
+    },
+  })
+  return { url: blob.url, name: file.name, size: file.size }
+}
+
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
@@ -40,6 +120,21 @@ export const authApi = {
 // Users
 export const usersApi = {
   me: () => api.get('/users/me'),
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.patch('/users/me/password', data),
+}
+
+export const uploadsApi = {
+  upload: async (file: File) => {
+    if (shouldUseBlobUploads()) {
+      return { data: await uploadToBlob('materials', file) }
+    }
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post<{ url: string; name: string; size: number }>('/uploads', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // Sessions
@@ -52,6 +147,7 @@ export const sessionsApi = {
     title: string
     start_time: string
   }) => api.post('/sessions', data),
+  delete: (id: number) => api.delete(`/sessions/${id}`),
 }
 
 // Courses
@@ -61,6 +157,15 @@ export interface LessonInput {
   video_url: string
   file_url: string
   sort_order: number
+}
+
+export interface LessonAsset {
+  id: number
+  lesson_id: number
+  type: 'video' | 'file'
+  url: string
+  original_filename: string
+  created_at: string
 }
 
 export interface CourseInput {
@@ -75,10 +180,18 @@ export const coursesApi = {
     api.get('/courses', { params }),
   create: (data: CourseInput) =>
     api.post('/courses', data),
+  delete: (id: number) =>
+    api.delete(`/courses/${id}`),
   addLesson: (courseId: number, data: LessonInput) =>
     api.post(`/courses/${courseId}/lessons`, data),
   updateLesson: (courseId: number, lessonId: number, data: LessonInput) =>
     api.put(`/courses/${courseId}/lessons/${lessonId}`, data),
+  deleteLesson: (courseId: number, lessonId: number) =>
+    api.delete(`/courses/${courseId}/lessons/${lessonId}`),
+  addLessonAsset: (lessonId: number, data: { type: 'video' | 'file'; url: string; original_filename: string }) =>
+    api.post<LessonAsset>(`/lessons/${lessonId}/assets`, data),
+  deleteLessonAsset: (lessonId: number, assetId: number) =>
+    api.delete(`/lessons/${lessonId}/assets/${assetId}`),
 }
 
 // Homework
@@ -125,6 +238,14 @@ export interface VideoUpload {
 
 export const videoApi = {
   upload: (lessonId: number, file: File, onProgress?: (pct: number) => void) => {
+    if (shouldUseBlobUploads()) {
+      return uploadToBlob('videos', file, onProgress).then((blob) =>
+        api.put<VideoUpload>(`/lessons/${lessonId}/video-url`, {
+          url: blob.url,
+          original_filename: blob.name,
+        }),
+      )
+    }
     const fd = new FormData()
     fd.append('video', file)
     return api.post<VideoUpload>(`/lessons/${lessonId}/video`, fd, {
@@ -135,6 +256,7 @@ export const videoApi = {
     })
   },
   status: (lessonId: number) => api.get<VideoUpload>(`/lessons/${lessonId}/video`),
+  clear: (lessonId: number) => api.delete(`/lessons/${lessonId}/video`),
 }
 
 // Audit

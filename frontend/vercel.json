@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/blob-upload", "destination": "/api/blob-upload" },
+    { "source": "/api/blob-delete", "destination": "/api/blob-delete" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

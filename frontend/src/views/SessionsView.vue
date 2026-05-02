@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { sessionsApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { CalendarDays, Plus, Clock, X } from 'lucide-vue-next'
+import { CalendarDays, Plus, Clock, X, Trash2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const sessions = ref<any[]>([])
@@ -10,6 +10,7 @@ const loading = ref(true)
 const error = ref('')
 const showCreateModal = ref(false)
 const creating = ref(false)
+const deletingId = ref<number | null>(null)
 
 const newSession = ref({
   title: '',
@@ -31,6 +32,10 @@ async function fetchSessions() {
 
 async function createSession() {
   if (!newSession.value.title.trim() || !newSession.value.start_time) return
+  if (newSession.value.title.trim().length > 120) {
+    error.value = 'Session title must be 120 characters or less'
+    return
+  }
   creating.value = true
   try {
     await sessionsApi.create({
@@ -44,6 +49,19 @@ async function createSession() {
     error.value = e.response?.data?.error || 'Failed to create'
   } finally {
     creating.value = false
+  }
+}
+
+async function deleteSession(id: number) {
+  if (!confirm('Delete this session?')) return
+  deletingId.value = id
+  try {
+    await sessionsApi.delete(id)
+    await fetchSessions()
+  } catch (e: any) {
+    error.value = e.response?.data?.error || 'Failed to delete'
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -111,12 +129,22 @@ onMounted(fetchSessions)
               <span>Teacher: {{ session.teacher_id || '—' }}</span>
             </div>
           </div>
-          <span class="text-xs text-white/30 shrink-0">#{{ session.id }}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs text-white/30">#{{ session.id }}</span>
+            <button
+              v-if="auth.isAdmin || auth.isManager || auth.isTeacher"
+              @click.stop="deleteSession(session.id)"
+              :disabled="deletingId === session.id"
+              class="w-9 h-9 rounded-lg bg-red-400/10 flex items-center justify-center text-red-400 hover:bg-red-400/20 disabled:opacity-50 transition-colors"
+              title="Delete"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Create modal -->
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" @click.self="showCreateModal = false">
@@ -133,6 +161,7 @@ onMounted(fetchSessions)
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Title</label>
                 <input
                   v-model="newSession.title"
+                  maxlength="120"
                   placeholder="Session title"
                   class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-transparent focus:border-cyan-400 focus:outline-none"
                 />

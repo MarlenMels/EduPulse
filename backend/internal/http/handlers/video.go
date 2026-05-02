@@ -15,6 +15,11 @@ type VideoHandler struct{ svc *service.VideoService }
 
 func NewVideoHandler(svc *service.VideoService) *VideoHandler { return &VideoHandler{svc: svc} }
 
+type videoURLReq struct {
+	URL              string `json:"url"`
+	OriginalFilename string `json:"original_filename"`
+}
+
 // Upload godoc
 // @Summary      Upload video for a lesson
 // @Description  Upload a video file for a lesson. Conversion to HLS runs asynchronously. Max 500MB. Allowed formats: mp4, mov, mkv. Roles: admin, manager, teacher
@@ -96,4 +101,41 @@ func (h *VideoHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, upload)
+}
+
+func (h *VideoHandler) SaveURL(w http.ResponseWriter, r *http.Request) {
+	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if lessonID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid lesson id")
+		return
+	}
+
+	var req videoURLReq
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	userID, _ := middleware.UserIDFromContext(r.Context())
+	upload, err := h.svc.SaveExternalURL(r.Context(), lessonID, userID, req.URL, req.OriginalFilename)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, upload)
+}
+
+func (h *VideoHandler) Clear(w http.ResponseWriter, r *http.Request) {
+	lessonID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if lessonID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid lesson id")
+		return
+	}
+
+	userID, _ := middleware.UserIDFromContext(r.Context())
+	if err := h.svc.Clear(r.Context(), lessonID, userID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

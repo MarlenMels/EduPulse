@@ -106,3 +106,40 @@ func (r *HomeworkRepo) List(ctx context.Context, f HomeworkListFilter) ([]Homewo
 	}
 	return out, rows.Err()
 }
+
+func (r *HomeworkRepo) ListForParent(ctx context.Context, parentID int64, status string, limit int) ([]HomeworkSubmission, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+
+	q := `
+		SELECT h.id, h.session_id, h.student_id, h.content, h.status, h.created_at
+		  FROM homework_submissions h
+		  JOIN parent_students ps ON ps.student_id = h.student_id
+		 WHERE ps.parent_id = ?`
+	args := []any{parentID}
+	if status != "" {
+		q += " AND h.status = ?"
+		args = append(args, status)
+	}
+	q += " ORDER BY h.id DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]HomeworkSubmission, 0, 64)
+	for rows.Next() {
+		var h HomeworkSubmission
+		var created string
+		if err := rows.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Status, &created); err != nil {
+			return nil, err
+		}
+		h.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}

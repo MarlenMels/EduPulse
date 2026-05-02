@@ -54,16 +54,26 @@ type Course struct {
 }
 
 type Lesson struct {
-	ID          int64     `json:"id"`
-	CourseID    int64     `json:"course_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	VideoURL    string    `json:"video_url"`
-	FileURL     string    `json:"file_url"`
-	HLSUrl      string    `json:"hls_url"`
-	VideoStatus string    `json:"video_status"`
-	SortOrder   int       `json:"sort_order"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int64         `json:"id"`
+	CourseID    int64         `json:"course_id"`
+	Title       string        `json:"title"`
+	Description string        `json:"description"`
+	VideoURL    string        `json:"video_url"`
+	FileURL     string        `json:"file_url"`
+	HLSUrl      string        `json:"hls_url"`
+	VideoStatus string        `json:"video_status"`
+	SortOrder   int           `json:"sort_order"`
+	CreatedAt   time.Time     `json:"created_at"`
+	Assets      []LessonAsset `json:"assets,omitempty"`
+}
+
+type LessonAsset struct {
+	ID               int64     `json:"id"`
+	LessonID         int64     `json:"lesson_id"`
+	Type             string    `json:"type"`
+	URL              string    `json:"url"`
+	OriginalFilename string    `json:"original_filename"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type VideoUpload struct {

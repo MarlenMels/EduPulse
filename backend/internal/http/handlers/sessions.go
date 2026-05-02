@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -49,6 +50,11 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createSessionReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	req.Title = strings.TrimSpace(req.Title)
+	if len(req.Title) > 120 {
+		writeError(w, http.StatusBadRequest, "title must be 120 characters or less")
 		return
 	}
 	st, err := time.Parse(time.RFC3339, req.StartTime)
@@ -123,4 +129,22 @@ func (h *SessionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s)
+}
+
+func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if id <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.write.Delete(r.Context(), uid, id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
