@@ -92,6 +92,6 @@ func (r *UserRepo) Create(ctx context.Context, email, passwordHash, role string)
 }
 
 func (r *UserRepo) UpdatePassword(ctx context.Context, id int64, passwordHash string) error {
-	_, err := r.db.ExecContext(ctx, "UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, id)
+	_, err := r.db.ExecContext(ctx, "UPDATE users SET password_hash = $1 WHERE id = $2", passwordHash, id)
 	return err
 }

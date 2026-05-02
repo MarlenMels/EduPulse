@@ -56,10 +56,11 @@ func Seed(db *sql.DB) error {
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT OR IGNORE INTO parent_students (parent_id, student_id, created_at)
-		SELECT p.id, s.id, ?
+		INSERT INTO parent_students (parent_id, student_id, created_at)
+		SELECT p.id, s.id, $1
 		  FROM users p, users s
-		 WHERE p.email = ? AND s.email = ?
+		 WHERE p.email = $2 AND s.email = $3
+		ON CONFLICT (parent_id, student_id) DO NOTHING
 	`, now, "parent@edupulse.local", "student@edupulse.local")
 	if err != nil {
 		return err

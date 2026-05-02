@@ -172,21 +172,22 @@ func (r *CourseRepo) LessonsByCourse(ctx context.Context, courseID int64) ([]Les
 
 func (r *CourseRepo) CreateLessonAsset(ctx context.Context, asset LessonAsset) (LessonAsset, error) {
 	created := time.Now().UTC().Format(time.RFC3339)
-	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO lesson_assets (lesson_id, type, url, original_filename, created_at) VALUES (?, ?, ?, ?, ?)",
+	var id int64
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO lesson_assets (lesson_id, type, url, original_filename, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 		asset.LessonID, asset.Type, asset.URL, asset.OriginalFilename, created,
-	)
+	).Scan(&id)
 	if err != nil {
 		return LessonAsset{}, err
 	}
-	asset.ID, _ = res.LastInsertId()
+	asset.ID = id
 	asset.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	return asset, nil
 }
 
 func (r *CourseRepo) AssetsByLesson(ctx context.Context, lessonID int64) ([]LessonAsset, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, lesson_id, type, url, original_filename, created_at FROM lesson_assets WHERE lesson_id = ? ORDER BY id",
+		"SELECT id, lesson_id, type, url, original_filename, created_at FROM lesson_assets WHERE lesson_id = $1 ORDER BY id",
 		lessonID,
 	)
 	if err != nil {
@@ -208,7 +209,7 @@ func (r *CourseRepo) AssetsByLesson(ctx context.Context, lessonID int64) ([]Less
 }
 
 func (r *CourseRepo) DeleteLessonAsset(ctx context.Context, lessonID, assetID int64) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM lesson_assets WHERE id = ? AND lesson_id = ?", assetID, lessonID)
+	_, err := r.db.ExecContext(ctx, "DELETE FROM lesson_assets WHERE id = $1 AND lesson_id = $2", assetID, lessonID)
 	return err
 }
 
@@ -222,18 +223,18 @@ func (r *CourseRepo) UpdateVideoStatus(ctx context.Context, lessonID int64, stat
 
 func (r *CourseRepo) ClearVideo(ctx context.Context, lessonID int64) error {
 	_, err := r.db.ExecContext(ctx,
-		"UPDATE lessons SET video_url = '', hls_url = '', video_status = '' WHERE id = ?",
+		"UPDATE lessons SET video_url = '', hls_url = '', video_status = '' WHERE id = $1",
 		lessonID,
 	)
 	return err
 }
 
 func (r *CourseRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM courses WHERE id = ?", id)
+	_, err := r.db.ExecContext(ctx, "DELETE FROM courses WHERE id = $1", id)
 	return err
 }
 
 func (r *CourseRepo) DeleteLesson(ctx context.Context, courseID, lessonID int64) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM lessons WHERE id = ? AND course_id = ?", lessonID, courseID)
+	_, err := r.db.ExecContext(ctx, "DELETE FROM lessons WHERE id = $1 AND course_id = $2", lessonID, courseID)
 	return err
 }
