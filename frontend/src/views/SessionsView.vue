@@ -8,9 +8,11 @@ const auth = useAuthStore()
 const sessions = ref<any[]>([])
 const loading = ref(true)
 const error = ref('')
+const formError = ref('')
 const showCreateModal = ref(false)
 const creating = ref(false)
 const deletingId = ref<number | null>(null)
+const dateInput = ref<HTMLInputElement | null>(null)
 
 const newSession = ref({
   title: '',
@@ -30,10 +32,45 @@ async function fetchSessions() {
   }
 }
 
+function openCreateModal() {
+  formError.value = ''
+  newSession.value = { title: '', start_time: '' }
+  showCreateModal.value = true
+}
+
+function closeCreateModal() {
+  showCreateModal.value = false
+  formError.value = ''
+}
+
+function chooseDateTime() {
+  dateInput.value?.showPicker?.()
+  dateInput.value?.focus()
+}
+
+function selectedDateLabel() {
+  if (!newSession.value.start_time) return ''
+  return new Date(newSession.value.start_time).toLocaleString('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 async function createSession() {
-  if (!newSession.value.title.trim() || !newSession.value.start_time) return
+  formError.value = ''
+  if (!newSession.value.title.trim()) {
+    formError.value = 'Title is required'
+    return
+  }
+  if (!newSession.value.start_time) {
+    formError.value = 'Choose date and time'
+    return
+  }
   if (newSession.value.title.trim().length > 120) {
-    error.value = 'Session title must be 120 characters or less'
+    formError.value = 'Session title must be 120 characters or less'
     return
   }
   creating.value = true
@@ -42,11 +79,11 @@ async function createSession() {
       title: newSession.value.title,
       start_time: new Date(newSession.value.start_time).toISOString(),
     })
-    showCreateModal.value = false
+    closeCreateModal()
     newSession.value = { title: '', start_time: '' }
     await fetchSessions()
   } catch (e: any) {
-    error.value = e.response?.data?.error || 'Failed to create'
+    formError.value = e.response?.data?.error || 'Failed to create'
   } finally {
     creating.value = false
   }
@@ -85,7 +122,7 @@ onMounted(fetchSessions)
       <h1 class="text-2xl font-extrabold text-cyan-400">Sessions</h1>
       <button
         v-if="auth.isAdmin || auth.isManager || auth.isTeacher"
-        @click="showCreateModal = true"
+        @click="openCreateModal"
         class="flex items-center gap-2 px-4 py-2.5 bg-cyan-400 text-black font-semibold text-sm rounded-xl hover:bg-cyan-300 transition-colors"
       >
         <Plus class="w-4 h-4" />
@@ -147,16 +184,17 @@ onMounted(fetchSessions)
 
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" @click.self="showCreateModal = false">
+        <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" @click.self="closeCreateModal">
           <div class="bg-[#1E1E1E] rounded-t-3xl sm:rounded-2xl w-full max-w-md p-6">
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-lg font-extrabold text-white">New Session</h2>
-              <button @click="showCreateModal = false" class="text-white/40 hover:text-white">
+              <button @click="closeCreateModal" class="text-white/40 hover:text-white">
                 <X class="w-5 h-5" />
               </button>
             </div>
 
             <form @submit.prevent="createSession" class="space-y-4">
+              <p v-if="formError" class="rounded-xl bg-red-400/10 px-4 py-3 text-sm text-red-400">{{ formError }}</p>
               <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Title</label>
                 <input
@@ -168,14 +206,23 @@ onMounted(fetchSessions)
               </div>
               <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Date & Time</label>
+                <button
+                  type="button"
+                  @click="chooseDateTime"
+                  class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-left text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
+                  :class="newSession.start_time ? 'text-white' : 'text-white/30'"
+                >
+                  {{ selectedDateLabel() || 'Choose date and time' }}
+                </button>
                 <input
+                  ref="dateInput"
                   v-model="newSession.start_time"
                   type="datetime-local"
-                  class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
+                  class="sr-only"
                 />
               </div>
               <div class="flex gap-3 pt-2">
-                <button type="button" @click="showCreateModal = false" class="flex-1 py-3 rounded-xl text-white/60 font-semibold text-sm hover:bg-white/5 transition-colors">
+                <button type="button" @click="closeCreateModal" class="flex-1 py-3 rounded-xl text-white/60 font-semibold text-sm hover:bg-white/5 transition-colors">
                   Cancel
                 </button>
                 <button type="submit" :disabled="creating" class="flex-1 py-3 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300 disabled:opacity-50 transition-colors">
