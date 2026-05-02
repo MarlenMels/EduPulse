@@ -300,3 +300,19 @@ export const notificationsApi = {
   list: (params?: { limit?: number }) =>
     api.get('/notifications', { params }),
 }
+
+// Admin: user management
+export interface AdminUser {
+  id: number
+  email: string
+  role: string
+  created_at: string
+}
+
+export const adminUsersApi = {
+  list: (params?: { limit?: number }) =>
+    api.get<{ items: AdminUser[]; count: number }>('/admin/users', { params }),
+  create: (data: { email: string; password: string; role: string }) =>
+    api.post<AdminUser>('/admin/users', data),
+  delete: (id: number) => api.delete(`/admin/users/${id}`),
+}

@@ -111,6 +111,12 @@ func NewServer(d Deps) *Server {
 		r.Get("/users/me", userH.Me)
 		r.Patch("/users/me/password", userH.ChangePassword)
 
+		// Admin: user management
+		adminUsersH := handlers.NewAdminUsersHandler(d.UserRepo)
+		r.Get("/admin/users", middleware.RBAC(auth.RoleAdmin)(http.HandlerFunc(adminUsersH.List)).ServeHTTP)
+		r.Post("/admin/users", middleware.RBAC(auth.RoleAdmin)(http.HandlerFunc(adminUsersH.Create)).ServeHTTP)
+		r.Delete("/admin/users/{id}", middleware.RBAC(auth.RoleAdmin)(http.HandlerFunc(adminUsersH.Delete)).ServeHTTP)
+
 		// Uploads
 		r.Post("/uploads", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(uploadH.Create)).ServeHTTP)
 

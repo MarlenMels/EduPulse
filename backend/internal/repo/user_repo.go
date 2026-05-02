@@ -110,3 +110,34 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, id int64, passwordHash st
 	_, err := r.db.ExecContext(ctx, "UPDATE users SET password_hash = $1 WHERE id = $2", passwordHash, id)
 	return err
 }
+
+func (r *UserRepo) List(ctx context.Context, limit int) ([]User, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, email, role, created_at FROM users ORDER BY id DESC LIMIT $1",
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]User, 0, 32)
+	for rows.Next() {
+		var u User
+		var created string
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &created); err != nil {
+			return nil, err
+		}
+		u.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (r *UserRepo) Delete(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
+	return err
+}

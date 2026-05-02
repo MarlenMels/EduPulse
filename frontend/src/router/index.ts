@@ -116,6 +116,18 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/admin/users',
+      component: () => import('@/layouts/AuthenticatedLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'admin-users',
+          component: () => import('@/views/AdminUsersView.vue'),
+        },
+      ],
+    },
   ],
 })
 
