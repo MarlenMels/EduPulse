@@ -8,16 +8,20 @@ function base64UrlToBuffer(value: string) {
 }
 
 function verifyAdmin(token: string) {
-  const [header, payload, signature] = token.split('.')
-  if (!header || !payload || !signature) return false
+  try {
+    const [header, payload, signature] = token.split('.')
+    if (!header || !payload || !signature) return false
 
-  const secret = process.env.EDUPULSE_JWT_SECRET || process.env.JWT_SECRET || 'dev-secret-change-me'
-  const expected = createHmac('sha256', secret).update(`${header}.${payload}`).digest()
-  const actual = base64UrlToBuffer(signature)
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return false
+    const secret = process.env.EDUPULSE_JWT_SECRET || process.env.JWT_SECRET || 'dev-secret-change-me'
+    const expected = createHmac('sha256', secret).update(`${header}.${payload}`).digest()
+    const actual = base64UrlToBuffer(signature)
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return false
 
-  const claims = JSON.parse(base64UrlToBuffer(payload).toString('utf8')) as { exp?: number; role?: string }
-  return Boolean(claims.exp && claims.exp * 1000 > Date.now() && claims.role === 'admin')
+    const claims = JSON.parse(base64UrlToBuffer(payload).toString('utf8')) as { exp?: number; role?: string }
+    return Boolean(claims.exp && claims.exp * 1000 > Date.now() && claims.role === 'admin')
+  } catch {
+    return false
+  }
 }
 
 function bearerToken(request: Request) {
@@ -37,18 +41,25 @@ function isEduPulseBlobURL(value: string) {
 }
 
 export default async function handler(request: Request) {
-  if (request.method !== 'DELETE') {
-    return Response.json({ error: 'method not allowed' }, { status: 405 })
-  }
-  if (!verifyAdmin(bearerToken(request))) {
-    return Response.json({ error: 'admin only' }, { status: 403 })
-  }
+  try {
+    if (request.method !== 'DELETE') {
+      return Response.json({ error: 'method not allowed' }, { status: 405 })
+    }
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return Response.json({ error: 'BLOB_READ_WRITE_TOKEN is not configured' }, { status: 500 })
+    }
+    if (!verifyAdmin(bearerToken(request))) {
+      return Response.json({ error: 'admin only' }, { status: 403 })
+    }
 
-  const body = (await request.json()) as { url?: string }
-  if (!body.url || !isEduPulseBlobURL(body.url)) {
-    return Response.json({ error: 'invalid blob url' }, { status: 400 })
-  }
+    const body = (await request.json()) as { url?: string }
+    if (!body.url || !isEduPulseBlobURL(body.url)) {
+      return Response.json({ error: 'invalid blob url' }, { status: 400 })
+    }
 
-  await del(body.url)
-  return Response.json({ status: 'deleted' })
+    await del(body.url)
+    return Response.json({ status: 'deleted' })
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : 'delete failed' }, { status: 400 })
+  }
 }

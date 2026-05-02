@@ -10,18 +10,22 @@ function base64UrlToBuffer(value: string) {
 }
 
 function verifyJwt(token: string) {
-  const [header, payload, signature] = token.split('.')
-  if (!header || !payload || !signature) return null
+  try {
+    const [header, payload, signature] = token.split('.')
+    if (!header || !payload || !signature) return null
 
-  const secret = process.env.EDUPULSE_JWT_SECRET || process.env.JWT_SECRET || 'dev-secret-change-me'
-  const expected = createHmac('sha256', secret).update(`${header}.${payload}`).digest()
-  const actual = base64UrlToBuffer(signature)
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
+    const secret = process.env.EDUPULSE_JWT_SECRET || process.env.JWT_SECRET || 'dev-secret-change-me'
+    const expected = createHmac('sha256', secret).update(`${header}.${payload}`).digest()
+    const actual = base64UrlToBuffer(signature)
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
 
-  const claims = JSON.parse(base64UrlToBuffer(payload).toString('utf8')) as { exp?: number; role?: string; uid?: number }
-  if (!claims.exp || claims.exp * 1000 < Date.now()) return null
-  if (!claims.role || !uploadRoles.has(claims.role)) return null
-  return claims
+    const claims = JSON.parse(base64UrlToBuffer(payload).toString('utf8')) as { exp?: number; role?: string; uid?: number }
+    if (!claims.exp || claims.exp * 1000 < Date.now()) return null
+    if (!claims.role || !uploadRoles.has(claims.role)) return null
+    return claims
+  } catch {
+    return null
+  }
 }
 
 function bearerToken(request: Request) {
@@ -31,18 +35,21 @@ function bearerToken(request: Request) {
 }
 
 export default async function handler(request: Request) {
-  if (request.method !== 'POST') {
-    return Response.json({ error: 'method not allowed' }, { status: 405 })
-  }
-
-  const body = (await request.json()) as HandleUploadBody
-  const isTokenRequest = body.type === 'blob.generate-client-token'
-  const claims = isTokenRequest ? verifyJwt(bearerToken(request)) : null
-  if (isTokenRequest && !claims) {
-    return Response.json({ error: 'unauthorized' }, { status: 401 })
-  }
-
   try {
+    if (request.method !== 'POST') {
+      return Response.json({ error: 'method not allowed' }, { status: 405 })
+    }
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return Response.json({ error: 'BLOB_READ_WRITE_TOKEN is not configured' }, { status: 500 })
+    }
+
+    const body = (await request.json()) as HandleUploadBody
+    const isTokenRequest = body.type === 'blob.generate-client-token'
+    const claims = isTokenRequest ? verifyJwt(bearerToken(request)) : null
+    if (isTokenRequest && !claims) {
+      return Response.json({ error: 'unauthorized' }, { status: 401 })
+    }
+
     const response = await handleUpload({
       body,
       request,
@@ -69,6 +76,7 @@ export default async function handler(request: Request) {
     })
     return Response.json(response)
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'upload failed' }, { status: 400 })
+    const message = error instanceof Error ? error.message : 'upload failed'
+    return Response.json({ error: message }, { status: 400 })
   }
 }
