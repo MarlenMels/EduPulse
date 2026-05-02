@@ -12,11 +12,12 @@ import (
 
 type SessionService struct {
 	repo     *repo.SessionRepo
+	users    *repo.UserRepo
 	auditSvc *AuditService
 }
 
-func NewSessionService(r *repo.SessionRepo, audit *AuditService) *SessionService {
-	return &SessionService{repo: r, auditSvc: audit}
+func NewSessionService(r *repo.SessionRepo, users *repo.UserRepo, audit *AuditService) *SessionService {
+	return &SessionService{repo: r, users: users, auditSvc: audit}
 }
 
 type CreateSessionInput struct {
@@ -43,7 +44,22 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 		teacherID = actorID
 	}
 	if teacherID <= 0 {
-		teacherID = actorID
+		teacher, err := s.users.FirstByRole(ctx, auth.RoleTeacher)
+		if err != nil {
+			return repo.Session{}, err
+		}
+		if teacher != nil {
+			teacherID = teacher.ID
+		} else {
+			teacherID = actorID
+		}
+	}
+	teacher, err := s.users.GetByID(ctx, teacherID)
+	if err != nil {
+		return repo.Session{}, err
+	}
+	if teacher == nil {
+		return repo.Session{}, errors.New("teacher not found")
 	}
 
 	sess := repo.Session{

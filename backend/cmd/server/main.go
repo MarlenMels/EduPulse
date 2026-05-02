@@ -70,7 +70,7 @@ func main() {
 	auditSvc := service.NewAuditService(auditRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	authSvc := auth.NewService(userRepo, jwtSecret)
-	sessionSvc := service.NewSessionService(sessionRepo, auditSvc)
+	sessionSvc := service.NewSessionService(sessionRepo, userRepo, auditSvc)
 	hwSvc := service.NewHomeworkService(hwRepo, auditSvc, bus)
 
 	userSvc := service.NewUserService(userRepo)

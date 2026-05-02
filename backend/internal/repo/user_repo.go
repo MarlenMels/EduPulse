@@ -40,6 +40,21 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*User, error) {
 	return &u, nil
 }
 
+func (r *UserRepo) FirstByRole(ctx context.Context, role string) (*User, error) {
+	row := r.db.QueryRowContext(ctx, "SELECT id, email, password_hash, role, created_at FROM users WHERE role = $1 ORDER BY id ASC LIMIT 1", role)
+	var u User
+	var created string
+	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &created); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	t, _ := time.Parse(time.RFC3339, created)
+	u.CreatedAt = t
+	return &u, nil
+}
+
 type RoleCount struct {
 	Role   string `json:"role"`
 	Total  int    `json:"total"`
