@@ -97,16 +97,35 @@ function blobPath(prefix: 'videos' | 'materials', file: File) {
 
 async function uploadToBlob(prefix: 'videos' | 'materials', file: File, onProgress?: (pct: number) => void) {
   const token = localStorage.getItem('token') || ''
-  const blob = await uploadBlob(blobPath(prefix, file), file, {
-    access: 'public',
-    handleUploadUrl: '/api/blob-upload',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    multipart: file.size > 8 * 1024 * 1024,
-    onUploadProgress: (event) => {
-      if (onProgress) onProgress(Math.round(event.percentage))
-    },
-  })
-  return { url: blob.url, name: file.name, size: file.size }
+  const abortController = new AbortController()
+  let timeout = window.setTimeout(() => abortController.abort(), 45_000)
+  const keepAlive = () => {
+    window.clearTimeout(timeout)
+    timeout = window.setTimeout(() => abortController.abort(), 45_000)
+  }
+
+  try {
+    if (onProgress) onProgress(1)
+    const blob = await uploadBlob(blobPath(prefix, file), file, {
+      access: 'public',
+      handleUploadUrl: '/api/blob-upload',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      multipart: file.size > 8 * 1024 * 1024,
+      abortSignal: abortController.signal,
+      onUploadProgress: (event) => {
+        keepAlive()
+        if (onProgress) onProgress(Math.max(1, Math.round(event.percentage)))
+      },
+    })
+    return { url: blob.url, name: file.name, size: file.size }
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Upload service did not respond. Check /api/blob-upload and Vercel Blob environment variables.')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
 }
 
 // Auth
