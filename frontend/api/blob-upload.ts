@@ -28,29 +28,46 @@ function verifyJwt(token: string) {
   }
 }
 
-function bearerToken(request: Request) {
-  const header = request.headers.get('authorization') || ''
+function bearerToken(request: { headers: Record<string, string | string[] | undefined> }) {
+  const rawHeader = request.headers.authorization || request.headers.Authorization
+  const header = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader || ''
   if (!header.toLowerCase().startsWith('bearer ')) return ''
   return header.slice(7).trim()
 }
 
-export default async function handler(request: Request) {
+function sendJson(response: any, status: number, data: unknown) {
+  response.status(status).json(data)
+}
+
+async function readJsonBody(request: any) {
+  if (request.body && typeof request.body === 'object') return request.body
+  if (typeof request.body === 'string') return JSON.parse(request.body)
+
+  const chunks: Buffer[] = []
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+  const rawBody = Buffer.concat(chunks).toString('utf8')
+  return rawBody ? JSON.parse(rawBody) : {}
+}
+
+export default async function handler(request: any, response: any) {
   try {
     if (request.method !== 'POST') {
-      return Response.json({ error: 'method not allowed' }, { status: 405 })
+      return sendJson(response, 405, { error: 'method not allowed' })
     }
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return Response.json({ error: 'BLOB_READ_WRITE_TOKEN is not configured' }, { status: 500 })
+      return sendJson(response, 500, { error: 'BLOB_READ_WRITE_TOKEN is not configured' })
     }
 
-    const body = (await request.json()) as HandleUploadBody
+    const body = (await readJsonBody(request)) as HandleUploadBody
     const isTokenRequest = body.type === 'blob.generate-client-token'
     const claims = isTokenRequest ? verifyJwt(bearerToken(request)) : null
     if (isTokenRequest && !claims) {
-      return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return sendJson(response, 401, { error: 'unauthorized' })
     }
 
-    const response = await handleUpload({
+    const uploadResponse = await handleUpload({
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
@@ -74,9 +91,9 @@ export default async function handler(request: Request) {
       },
       onUploadCompleted: async () => {},
     })
-    return Response.json(response)
+    return sendJson(response, 200, uploadResponse)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'upload failed'
-    return Response.json({ error: message }, { status: 400 })
+    return sendJson(response, 400, { error: message })
   }
 }
