@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,14 +21,14 @@ func NewSessionHandler(write *service.SessionService, read *service.SessionReadS
 }
 
 type createSessionReq struct {
-	TeacherID int64  `json:"teacher_id,omitempty" example:"2"`
-	Title     string `json:"title" example:"Math 101"`
+	CourseID  int64  `json:"course_id" example:"1"`
+	Title     string `json:"title" example:"Math 101 — lecture 1"`
 	StartTime string `json:"start_time" example:"2026-05-01T10:00:00Z"`
 }
 
 // Create godoc
 // @Summary      Create a session
-// @Description  Create a new teaching session. Roles: admin, manager, teacher
+// @Description  Create a new teaching session for a course. Roles: admin, manager, teacher (only on courses they teach).
 // @Tags         Sessions
 // @Accept       json
 // @Produce      json
@@ -49,12 +48,12 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req createSessionReq
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
 		return
 	}
-	req.Title = strings.TrimSpace(req.Title)
-	if len(req.Title) > 120 {
-		writeError(w, http.StatusBadRequest, "title must be 120 characters or less")
+	title, err := normalizeRequiredText(req.Title, "title", 120)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	st, err := time.Parse(time.RFC3339, req.StartTime)
@@ -64,8 +63,8 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s, err := h.write.Create(r.Context(), uid, service.CreateSessionInput{
-		TeacherID: req.TeacherID,
-		Title:     req.Title,
+		CourseID:  req.CourseID,
+		Title:     title,
 		StartTime: st,
 		ActorRole: role,
 	})
@@ -77,23 +76,23 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // List godoc
-// @Summary      List sessions
-// @Description  Retrieve a list of teaching sessions
+// @Summary      List sessions visible to the current user
+// @Description  admin/manager see all, teacher sees their courses' sessions, student sees enrolled courses' sessions.
 // @Tags         Sessions
 // @Produce      json
 // @Security     BearerAuth
 // @Param        limit  query     int  false  "Max results"  default(50)
 // @Success      200    {object}  listResponse
-// @Failure      500    {object}  errorResponse
 // @Router       /sessions [get]
 func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
+	uid, _ := middleware.UserIDFromContext(r.Context())
+	role, _ := middleware.RoleFromContext(r.Context())
+	limit, err := parseLimitParam(r, 50)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
-	sessions, err := h.write.List(r.Context(), limit)
+	sessions, err := h.write.ListForActor(r.Context(), uid, role, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db error")
 		return
@@ -106,23 +105,19 @@ func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get godoc
 // @Summary      Get session by ID
-// @Description  Retrieve a single session by its ID
 // @Tags         Sessions
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Session ID"
 // @Success      200  {object}  repo.Session
-// @Failure      400  {object}  errorResponse
 // @Failure      404  {object}  errorResponse
 // @Router       /sessions/{id} [get]
 func (h *SessionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if id <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-
 	s, err := h.read.Get(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())

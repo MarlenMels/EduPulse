@@ -62,6 +62,9 @@ func main() {
 	notifRepo := repo.NewNotificationRepo(database)
 	courseRepo := repo.NewCourseRepo(database)
 	videoRepo := repo.NewVideoRepo(database)
+	courseTeachersRepo := repo.NewCourseTeachersRepo(database)
+	enrollmentsRepo := repo.NewEnrollmentsRepo(database)
+	assignmentRepo := repo.NewAssignmentRepo(database)
 
 	// Event bus + worker
 	bus := events.NewBus(256)
@@ -70,12 +73,14 @@ func main() {
 	auditSvc := service.NewAuditService(auditRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	authSvc := auth.NewService(userRepo, jwtSecret)
-	sessionSvc := service.NewSessionService(sessionRepo, userRepo, auditSvc)
-	hwSvc := service.NewHomeworkService(hwRepo, sessionRepo, auditSvc, bus)
+	sessionSvc := service.NewSessionService(sessionRepo, courseTeachersRepo, enrollmentsRepo, auditSvc)
+	hwSvc := service.NewHomeworkService(hwRepo, assignmentRepo, sessionRepo, enrollmentsRepo, auditSvc, bus)
 
 	userSvc := service.NewUserService(userRepo)
 	sessionReadSvc := service.NewSessionReadService(sessionRepo)
-	hwManageSvc := service.NewHomeworkManageService(hwRepo, auditSvc, bus)
+	hwManageSvc := service.NewHomeworkManageService(hwRepo, assignmentRepo, sessionRepo, courseTeachersRepo, auditSvc, bus)
+	assignmentSvc := service.NewAssignmentService(assignmentRepo, sessionRepo, courseTeachersRepo, enrollmentsRepo, auditSvc)
+	enrollmentSvc := service.NewEnrollmentService(courseRepo, userRepo, courseTeachersRepo, enrollmentsRepo, auditSvc)
 	courseSvc := service.NewCourseService(courseRepo)
 	statsSvc := service.NewStatsService(userRepo)
 	videoSvc := service.NewVideoService(videoRepo, courseRepo, auditSvc, "./videos", "./hls", 500*1024*1024)
@@ -94,6 +99,8 @@ func main() {
 		SessionReadSvc:    sessionReadSvc,
 		HomeworkSvc:       hwSvc,
 		HomeworkManageSvc: hwManageSvc,
+		AssignmentSvc:     assignmentSvc,
+		EnrollmentSvc:     enrollmentSvc,
 		AuditSvc:          auditSvc,
 		NotificationSvc:   notifSvc,
 		CourseSvc:         courseSvc,

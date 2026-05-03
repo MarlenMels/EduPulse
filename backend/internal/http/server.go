@@ -25,6 +25,8 @@ type Deps struct {
 	SessionReadSvc    *service.SessionReadService
 	HomeworkSvc       *service.HomeworkService
 	HomeworkManageSvc *service.HomeworkManageService
+	AssignmentSvc     *service.AssignmentService
+	EnrollmentSvc     *service.EnrollmentService
 	AuditSvc          *service.AuditService
 	NotificationSvc   *service.NotificationService
 	CourseSvc         *service.CourseService
@@ -126,11 +128,27 @@ func NewServer(d Deps) *Server {
 		r.Get("/sessions/{id}", sessionH.Get)
 		r.Delete("/sessions/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(sessionH.Delete)).ServeHTTP)
 
-		// Homework
+		// Homework — student-side
 		r.Post("/homework/submit", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Submit)).ServeHTTP)
-		r.Get("/homework", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher, auth.RoleManager)(http.HandlerFunc(hwH.List)).ServeHTTP)
-		r.Get("/homework/mine", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent, auth.RoleParent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
-		r.Patch("/homework/{id}/status", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher)(http.HandlerFunc(hwH.UpdateStatus)).ServeHTTP)
+		r.Get("/homework/mine", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
+		r.Patch("/homework/{id}/status", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher, auth.RoleManager)(http.HandlerFunc(hwH.UpdateStatus)).ServeHTTP)
+
+		// Assignments — teacher creates, everyone with access can list
+		assignmentH := handlers.NewAssignmentHandler(d.AssignmentSvc, d.HomeworkManageSvc)
+		r.Post("/assignments", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Create)).ServeHTTP)
+		r.Get("/assignments", assignmentH.List)
+		r.Get("/assignments/{id}/submissions", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Submissions)).ServeHTTP)
+		r.Delete("/assignments/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Delete)).ServeHTTP)
+
+		// Enrollments and teacher↔course management (admin/manager only for mutations).
+		enrollH := handlers.NewEnrollmentHandler(d.EnrollmentSvc)
+		r.Get("/courses/{id}/teachers", enrollH.ListTeachers)
+		r.Get("/courses/{id}/students", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(enrollH.ListStudents)).ServeHTTP)
+		r.Post("/admin/courses/{id}/teachers", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(enrollH.AddTeacher)).ServeHTTP)
+		r.Delete("/admin/courses/{id}/teachers/{teacherId}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(enrollH.RemoveTeacher)).ServeHTTP)
+		r.Post("/admin/courses/{id}/students", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(enrollH.EnrollStudent)).ServeHTTP)
+		r.Delete("/admin/courses/{id}/students/{studentId}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager)(http.HandlerFunc(enrollH.UnenrollStudent)).ServeHTTP)
+		r.Get("/teachers/me/students", middleware.RBAC(auth.RoleTeacher)(http.HandlerFunc(enrollH.MyStudents)).ServeHTTP)
 
 		// Courses
 		r.Post("/courses", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(courseH.Create)).ServeHTTP)

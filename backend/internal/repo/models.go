@@ -12,20 +12,42 @@ type User struct {
 
 type Session struct {
 	ID        int64     `json:"id"`
-	TeacherID int64     `json:"teacher_id"`
+	CourseID  int64     `json:"course_id"`
 	Title     string    `json:"title"`
 	StartTime time.Time `json:"start_time"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-type HomeworkSubmission struct {
+type Assignment struct {
 	ID          int64     `json:"id"`
 	SessionID   int64     `json:"session_id"`
-	StudentID   int64     `json:"student_id"`
-	Content     string    `json:"content"`
-	Attachments string    `json:"attachments"`
-	Status      string    `json:"status"`
+	CreatedBy   int64     `json:"created_by"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type HomeworkSubmission struct {
+	ID           int64     `json:"id"`
+	AssignmentID int64     `json:"assignment_id"`
+	StudentID    int64     `json:"student_id"`
+	Content      string    `json:"content"`
+	Attachments  string    `json:"attachments"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type CourseTeacher struct {
+	CourseID  int64     `json:"course_id"`
+	TeacherID int64     `json:"teacher_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type CourseEnrollment struct {
+	CourseID   int64     `json:"course_id"`
+	StudentID  int64     `json:"student_id"`
+	EnrolledBy int64     `json:"enrolled_by"`
+	EnrolledAt time.Time `json:"enrolled_at"`
 }
 
 type AuditLog struct {
