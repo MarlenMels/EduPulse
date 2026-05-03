@@ -48,6 +48,37 @@ func (r *HomeworkRepo) UpdateStatus(ctx context.Context, id int64, status string
 	return err
 }
 
+// List returns homework submissions with optional filtering
+func (r *HomeworkRepo) List(ctx context.Context, f HomeworkFilter) ([]HomeworkSubmission, error) {
+	limit := f.Limit
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, assignment_id, student_id, content, attachments, status, created_at
+		  FROM homework_submissions
+		  ORDER BY id DESC
+		  LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	out := make([]HomeworkSubmission, 0, 16)
+	for rows.Next() {
+		var h HomeworkSubmission
+		var created string
+		if err := rows.Scan(&h.ID, &h.AssignmentID, &h.StudentID, &h.Content, &h.Attachments, &h.Status, &created); err != nil {
+			return nil, err
+		}
+		h.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 // HasSubmission returns true if the student already submitted for the assignment.
 func (r *HomeworkRepo) HasSubmission(ctx context.Context, assignmentID, studentID int64) (bool, error) {
 	var n int

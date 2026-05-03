@@ -37,6 +37,10 @@ type HomeworkSubmission struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type HomeworkFilter struct {
+	Limit int
+}
+
 type CourseTeacher struct {
 	CourseID  int64     `json:"course_id"`
 	TeacherID int64     `json:"teacher_id"`
