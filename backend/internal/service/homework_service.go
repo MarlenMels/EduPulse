@@ -21,8 +21,9 @@ func NewHomeworkService(r *repo.HomeworkRepo, sessions *repo.SessionRepo, audit 
 }
 
 type SubmitHomeworkInput struct {
-	SessionID int64
-	Content   string
+	SessionID   int64
+	Content     string
+	Attachments string
 }
 
 func (s *HomeworkService) Submit(ctx context.Context, actorStudentID int64, in SubmitHomeworkInput) (repo.HomeworkSubmission, error) {
@@ -42,10 +43,11 @@ func (s *HomeworkService) Submit(ctx context.Context, actorStudentID int64, in S
 	}
 
 	sub, err := s.repo.Create(ctx, repo.HomeworkSubmission{
-		SessionID: in.SessionID,
-		StudentID: actorStudentID,
-		Content:   in.Content,
-		Status:    "submitted",
+		SessionID:   in.SessionID,
+		StudentID:   actorStudentID,
+		Content:     in.Content,
+		Attachments: in.Attachments,
+		Status:      "submitted",
 	})
 	if err != nil {
 		return repo.HomeworkSubmission{}, err

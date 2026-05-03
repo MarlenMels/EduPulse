@@ -226,7 +226,7 @@ export const coursesApi = {
 
 // Homework
 export const homeworkApi = {
-  submit: (data: { session_id: number; content: string }) =>
+  submit: (data: { session_id: number; content: string; attachments?: string }) =>
     api.post('/homework/submit', data),
   list: (params?: { session_id?: number; student_id?: number; status?: string; limit?: number }) =>
     api.get('/homework', { params }),

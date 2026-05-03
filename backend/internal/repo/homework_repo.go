@@ -15,8 +15,8 @@ func (r *HomeworkRepo) Create(ctx context.Context, h HomeworkSubmission) (Homewo
 	created := time.Now().UTC().Format(time.RFC3339)
 	var id int64
 	err := r.db.QueryRowContext(ctx,
-		"INSERT INTO homework_submissions (session_id, student_id, content, status, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		h.SessionID, h.StudentID, h.Content, h.Status, created,
+		"INSERT INTO homework_submissions (session_id, student_id, content, attachments, status, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+		h.SessionID, h.StudentID, h.Content, h.Attachments, h.Status, created,
 	).Scan(&id)
 	if err != nil {
 		return HomeworkSubmission{}, err
@@ -28,12 +28,12 @@ func (r *HomeworkRepo) Create(ctx context.Context, h HomeworkSubmission) (Homewo
 
 func (r *HomeworkRepo) GetByID(ctx context.Context, id int64) (*HomeworkSubmission, error) {
 	row := r.db.QueryRowContext(ctx,
-		"SELECT id, session_id, student_id, content, status, created_at FROM homework_submissions WHERE id = $1",
+		"SELECT id, session_id, student_id, content, attachments, status, created_at FROM homework_submissions WHERE id = $1",
 		id,
 	)
 	var h HomeworkSubmission
 	var created string
-	if err := row.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Status, &created); err != nil {
+	if err := row.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Attachments, &h.Status, &created); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -61,7 +61,7 @@ func (r *HomeworkRepo) List(ctx context.Context, f HomeworkListFilter) ([]Homewo
 		limit = 50
 	}
 
-	q := "SELECT id, session_id, student_id, content, status, created_at FROM homework_submissions"
+	q := "SELECT id, session_id, student_id, content, attachments, status, created_at FROM homework_submissions"
 	args := make([]any, 0, 5)
 	where := ""
 	n := 0
@@ -101,7 +101,7 @@ func (r *HomeworkRepo) List(ctx context.Context, f HomeworkListFilter) ([]Homewo
 	for rows.Next() {
 		var h HomeworkSubmission
 		var created string
-		if err := rows.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Status, &created); err != nil {
+		if err := rows.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Attachments, &h.Status, &created); err != nil {
 			return nil, err
 		}
 		h.CreatedAt, _ = time.Parse(time.RFC3339, created)
@@ -116,7 +116,7 @@ func (r *HomeworkRepo) ListForParent(ctx context.Context, parentID int64, status
 	}
 
 	q := `
-		SELECT h.id, h.session_id, h.student_id, h.content, h.status, h.created_at
+		SELECT h.id, h.session_id, h.student_id, h.content, h.attachments, h.status, h.created_at
 		  FROM homework_submissions h
 		  JOIN parent_students ps ON ps.student_id = h.student_id
 		 WHERE ps.parent_id = $1`
@@ -141,7 +141,7 @@ func (r *HomeworkRepo) ListForParent(ctx context.Context, parentID int64, status
 	for rows.Next() {
 		var h HomeworkSubmission
 		var created string
-		if err := rows.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Status, &created); err != nil {
+		if err := rows.Scan(&h.ID, &h.SessionID, &h.StudentID, &h.Content, &h.Attachments, &h.Status, &created); err != nil {
 			return nil, err
 		}
 		h.CreatedAt, _ = time.Parse(time.RFC3339, created)

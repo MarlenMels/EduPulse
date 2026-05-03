@@ -19,12 +19,13 @@ type Session struct {
 }
 
 type HomeworkSubmission struct {
-	ID        int64     `json:"id"`
-	SessionID int64     `json:"session_id"`
-	StudentID int64     `json:"student_id"`
-	Content   string    `json:"content"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64     `json:"id"`
+	SessionID   int64     `json:"session_id"`
+	StudentID   int64     `json:"student_id"`
+	Content     string    `json:"content"`
+	Attachments string    `json:"attachments"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type AuditLog struct {

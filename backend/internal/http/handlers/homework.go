@@ -23,8 +23,9 @@ func NewHomeworkHandler(submit *service.HomeworkService, manage *service.Homewor
 }
 
 type submitHomeworkReq struct {
-	SessionID int64  `json:"session_id" example:"1"`
-	Content   string `json:"content" example:"My homework answer"`
+	SessionID   int64  `json:"session_id" example:"1"`
+	Content     string `json:"content" example:"My homework answer"`
+	Attachments string `json:"attachments" example:"[{'url':'/uploads/file.jpg','name':'file.jpg','size':1024}]"`
 }
 
 // Submit godoc
@@ -58,8 +59,9 @@ func (h *HomeworkHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sub, err := h.submit.Submit(r.Context(), uid, service.SubmitHomeworkInput{
-		SessionID: req.SessionID,
-		Content:   content,
+		SessionID:   req.SessionID,
+		Content:     content,
+		Attachments: req.Attachments,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
