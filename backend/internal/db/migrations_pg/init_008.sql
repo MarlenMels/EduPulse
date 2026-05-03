@@ -1,5 +1,6 @@
 -- Beta cleanup: see SQLite init_008 for rationale.
 DROP TABLE IF EXISTS homework_submissions;
+DROP TABLE IF EXISTS assignments;
 DROP TABLE IF EXISTS sessions;
 
 CREATE TABLE sessions (
