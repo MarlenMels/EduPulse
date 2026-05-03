@@ -42,6 +42,18 @@ func (s *HomeworkManageService) Submissions(ctx context.Context, assignmentID in
 	return s.assignments.Submissions(ctx, assignmentID)
 }
 
+// ListAll returns all homework submissions (admin/manager only)
+func (s *HomeworkManageService) ListAll(ctx context.Context, limit int) ([]repo.HomeworkSubmission, error) {
+	return s.hw.List(ctx, repo.HomeworkFilter{Limit: limit})
+}
+
+// ListByTeacher returns homework submissions for teacher's courses
+// TODO: Implement proper filtering by teacher's courses
+func (s *HomeworkManageService) ListByTeacher(ctx context.Context, teacherID int64, limit int) ([]repo.HomeworkSubmission, error) {
+	// For now, return all submissions (temporarily simplified)
+	return s.hw.List(ctx, repo.HomeworkFilter{Limit: limit})
+}
+
 // UpdateStatus changes a submission's status. Teachers can only grade submissions
 // for assignments belonging to courses they teach (or assignments they created).
 // Admin/manager can grade anything.

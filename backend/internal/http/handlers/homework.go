@@ -99,6 +99,48 @@ type patchStatusReq struct {
 // @Param        body  body  patchStatusReq  true  "New status"
 // @Success      200   {object}  repo.HomeworkSubmission
 // @Router       /homework/{id}/status [patch]
+// List godoc
+// @Summary      List all homework submissions
+// @Description  Get list of all homework submissions (admin/manager/teacher view)
+// @Tags         Homework
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit  query     int  false  "Max results"  default(50)
+// @Success      200   {object}  map[string]interface{}{"items": []repo.HomeworkSubmission, "count": int}
+// @Router       /homework [get]
+func (h *HomeworkHandler) List(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.RoleFromContext(r.Context())
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	var items []repo.HomeworkSubmission
+	var err error
+
+	// Admin/manager can see all submissions
+	if role == "admin" || role == "manager" {
+		items, err = h.manage.ListAll(r.Context(), limit)
+	} else {
+		// Teachers can see submissions for their courses
+		items, err = h.manage.ListByTeacher(r.Context(), uid, limit)
+	}
+
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+}
+
 func (h *HomeworkHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
