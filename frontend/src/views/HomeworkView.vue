@@ -21,14 +21,10 @@ const isStudent = computed(() => auth.isStudent)
 const loading = ref(true)
 const error = ref('')
 
-// Staff view: list of assignments
 const assignments = ref<AssignmentRow[]>([])
-
-// Student view: own submissions + assignments to choose from
 const mine = ref<MineRow[]>([])
 const studentAssignments = ref<AssignmentRow[]>([])
 
-// Modal: create OR edit assignment (staff)
 const showCreate = ref(false)
 const editingId = ref<number | null>(null)
 const sessions = ref<SessionRow[]>([])
@@ -36,13 +32,11 @@ const newAssignment = ref({ session_id: 0, title: '', description: '' })
 const creating = ref(false)
 const createError = ref('')
 
-// Modal: view submissions (staff)
 const showSubs = ref(false)
 const subsAssignment = ref<AssignmentRow | null>(null)
 const submissions = ref<SubmissionRow[]>([])
 const subsLoading = ref(false)
 
-// Modal: submit homework (student)
 const showSubmit = ref(false)
 const submitTarget = ref<AssignmentRow | null>(null)
 const submission = ref({ content: '' })

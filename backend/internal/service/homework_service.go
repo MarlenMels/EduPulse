@@ -10,9 +10,6 @@ import (
 	"edupulse/internal/repo"
 )
 
-// HomeworkService handles student-side actions: submitting homework for an
-// assignment. Teacher-side workflows (creating assignments, grading) live in
-// AssignmentService and HomeworkManageService.
 type HomeworkService struct {
 	repo        *repo.HomeworkRepo
 	assignments *repo.AssignmentRepo

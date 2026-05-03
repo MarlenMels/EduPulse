@@ -155,11 +155,7 @@ export const usersApi = {
 }
 
 export const uploadsApi = {
-  upload: async (file: File) => {
-    // Force blob upload for testing
-    console.log('Uploading file via blob:', file.name)
-    return { data: await uploadToBlob('materials', file) }
-  },
+  upload: async (file: File) => ({ data: await uploadToBlob('materials', file) }),
 }
 
 // Sessions

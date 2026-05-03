@@ -1,3 +1,7 @@
+# OS junk
+.DS_Store
+**/.DS_Store
+
 # Backend
 backend/edupulse.db
 backend/server

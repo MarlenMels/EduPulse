@@ -18,7 +18,6 @@ const students = ref<CourseUser[]>([])
 const loading = ref(true)
 const error = ref('')
 
-// Add modal: teacher or student
 const showAdd = ref(false)
 const addKind = ref<'teacher' | 'student'>('teacher')
 const candidates = ref<CourseUser[]>([])

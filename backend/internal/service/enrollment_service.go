@@ -8,9 +8,7 @@ import (
 	"edupulse/internal/repo"
 )
 
-// EnrollmentService manages teacher↔course and student↔course relationships.
-// All mutating operations are admin/manager only; the handlers enforce that
-// via RBAC, this service trusts the caller.
+// Mutating operations are gated by RBAC at the handler layer.
 type EnrollmentService struct {
 	courses     *repo.CourseRepo
 	users       *repo.UserRepo
