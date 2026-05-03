@@ -48,7 +48,13 @@ async function changePassword() {
     passwordForm.value = { current_password: '', new_password: '', confirm_password: '' }
     passwordSuccess.value = 'Password changed'
   } catch (e: any) {
-    passwordError.value = e.response?.data?.error || 'Failed to change password'
+    if (e.response?.data?.error) {
+      passwordError.value = e.response.data.error
+    } else if (e.code === 'ERR_NETWORK' || e.message === 'Network Error') {
+      passwordError.value = 'Cannot reach server. Try again.'
+    } else {
+      passwordError.value = `Failed to change password (HTTP ${e.response?.status ?? '?'})`
+    }
   } finally {
     changingPassword.value = false
   }

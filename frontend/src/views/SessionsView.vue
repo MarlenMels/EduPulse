@@ -157,7 +157,13 @@ onMounted(fetchSessions)
             <CalendarDays class="w-5 h-5 text-blue-400" />
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="font-bold text-white">{{ session.title }}</h3>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-bold text-white">{{ session.title }}</h3>
+              <span
+                class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-cyan-400/15 text-cyan-300 border border-cyan-400/30"
+                :title="'Use this Session ID when submitting homework'"
+              >ID {{ session.id }}</span>
+            </div>
             <div class="flex flex-wrap items-center gap-3 mt-2 text-xs text-white/40">
               <span class="flex items-center gap-1">
                 <Clock class="w-3 h-3" />
@@ -167,7 +173,6 @@ onMounted(fetchSessions)
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs text-white/30">#{{ session.id }}</span>
             <button
               v-if="auth.isAdmin || auth.isManager || auth.isTeacher"
               @click.stop="deleteSession(session.id)"

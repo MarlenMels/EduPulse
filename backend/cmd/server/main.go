@@ -71,7 +71,7 @@ func main() {
 	notifSvc := service.NewNotificationService(notifRepo)
 	authSvc := auth.NewService(userRepo, jwtSecret)
 	sessionSvc := service.NewSessionService(sessionRepo, userRepo, auditSvc)
-	hwSvc := service.NewHomeworkService(hwRepo, auditSvc, bus)
+	hwSvc := service.NewHomeworkService(hwRepo, sessionRepo, auditSvc, bus)
 
 	userSvc := service.NewUserService(userRepo)
 	sessionReadSvc := service.NewSessionReadService(sessionRepo)

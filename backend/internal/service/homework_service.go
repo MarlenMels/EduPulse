@@ -11,12 +11,13 @@ import (
 
 type HomeworkService struct {
 	repo     *repo.HomeworkRepo
+	sessions *repo.SessionRepo
 	auditSvc *AuditService
 	bus      *events.Bus
 }
 
-func NewHomeworkService(r *repo.HomeworkRepo, audit *AuditService, bus *events.Bus) *HomeworkService {
-	return &HomeworkService{repo: r, auditSvc: audit, bus: bus}
+func NewHomeworkService(r *repo.HomeworkRepo, sessions *repo.SessionRepo, audit *AuditService, bus *events.Bus) *HomeworkService {
+	return &HomeworkService{repo: r, sessions: sessions, auditSvc: audit, bus: bus}
 }
 
 type SubmitHomeworkInput struct {
@@ -30,6 +31,14 @@ func (s *HomeworkService) Submit(ctx context.Context, actorStudentID int64, in S
 	}
 	if in.Content == "" {
 		return repo.HomeworkSubmission{}, errors.New("content is required")
+	}
+
+	sess, err := s.sessions.GetByID(ctx, in.SessionID)
+	if err != nil {
+		return repo.HomeworkSubmission{}, err
+	}
+	if sess == nil {
+		return repo.HomeworkSubmission{}, errors.New("session not found")
 	}
 
 	sub, err := s.repo.Create(ctx, repo.HomeworkSubmission{
