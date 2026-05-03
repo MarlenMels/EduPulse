@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { homeworkApi, sessionsApi, uploadsApi } from '@/api/client'
+import { homeworkApi, sessionsApi, uploadsApi, resolveMediaUrl } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { BookOpen, Send, CheckCircle, Clock, AlertCircle, X, Paperclip, Upload } from 'lucide-vue-next'
 
@@ -195,14 +195,17 @@ async function openSubmitModal() {
             <p class="text-sm text-white/60 mt-1 line-clamp-2">{{ hw.content }}</p>
             <div v-if="hw.attachments" class="mt-2">
               <div class="flex flex-wrap gap-2">
-                <span 
+                <a 
                   v-for="(attachment, index) in JSON.parse(hw.attachments || '[]')" 
                   :key="index"
-                  class="inline-flex items-center gap-1 px-2 py-1 bg-[#2D2D2D] rounded-lg text-xs text-cyan-400"
+                  :href="resolveMediaUrl(attachment.url)"
+                  :download="attachment.name"
+                  target="_blank"
+                  class="inline-flex items-center gap-1 px-2 py-1 bg-[#2D2D2D] rounded-lg text-xs text-cyan-400 hover:bg-[#3D3D3D] transition-colors cursor-pointer"
                 >
                   <Paperclip class="w-3 h-3" />
                   {{ attachment.name }}
-                </span>
+                </a>
               </div>
             </div>
             <p class="text-xs text-white/30 mt-2">Session: {{ hw.session_id }} · Student: {{ hw.student_id }}</p>
