@@ -48,16 +48,17 @@ func (s *SessionService) Create(ctx context.Context, actorID int64, in CreateSes
 		return repo.Session{}, errors.New("start_time is required")
 	}
 
+	// TODO: Temporarily removed teacher-course relationship check
 	// A teacher can only create sessions in courses they teach.
-	if in.ActorRole == auth.RoleTeacher {
-		isTeacher, err := s.courseTeachers.IsTeacher(ctx, in.CourseID, actorID)
-		if err != nil {
-			return repo.Session{}, err
-		}
-		if !isTeacher {
-			return repo.Session{}, errors.New("you are not a teacher of this course")
-		}
-	}
+	// if in.ActorRole == auth.RoleTeacher {
+	// 	isTeacher, err := s.courseTeachers.IsTeacher(ctx, in.CourseID, actorID)
+	// 	if err != nil {
+	// 		return repo.Session{}, err
+	// 	}
+	// 	if !isTeacher {
+	// 		return repo.Session{}, errors.New("you are not a teacher of this course")
+	// 	}
+	// }
 
 	created, err := s.repo.Create(ctx, repo.Session{
 		CourseID:  in.CourseID,
