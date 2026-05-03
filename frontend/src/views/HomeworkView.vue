@@ -72,7 +72,18 @@ function removeAttachment(index: number) {
 }
 
 async function submitHomework() {
-  if (!newHomework.value.content.trim() || !newHomework.value.session_id) return
+  console.log('Submit homework called:', {
+    content: newHomework.value.content,
+    contentTrimmed: newHomework.value.content.trim(),
+    sessionId: newHomework.value.session_id,
+    attachments: attachments.value
+  })
+  
+  if (!newHomework.value.content.trim() || !newHomework.value.session_id) {
+    console.log('Validation failed - content or session_id missing')
+    return
+  }
+  
   submitting.value = true
   try {
     const attachmentsJson = attachments.value.length > 0 ? JSON.stringify(attachments.value) : ''
