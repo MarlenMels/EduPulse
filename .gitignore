@@ -9,3 +9,9 @@ backend/uploads/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# Environment files — NEVER commit real secrets.
+# Only .env.example is tracked (a template with placeholder values).
+.env
+.env.*
+!.env.example
