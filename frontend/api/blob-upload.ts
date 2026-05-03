@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-const uploadRoles = new Set(['admin', 'manager', 'teacher'])
+const uploadRoles = new Set(['admin', 'manager', 'teacher', 'student'])
 
 function base64UrlToBuffer(value: string) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
