@@ -97,9 +97,9 @@ The backend supports either driver — when `EDUPULSE_DB_URL` is empty it falls 
 
 | Layer | Technologies |
 |---|---|
-| **Backend** | Go, Chi Router, SQLite (modernc.org/sqlite) or Postgres (pgx/v5), JWT, bcrypt, Swaggo |
-| **Frontend** | Vue 3, TypeScript, Tailwind CSS v4, Pinia, Vue Router, Axios |
-| **Infrastructure** | Vite, HLS Streaming, Event Bus |
+| **Backend** | Go, Chi Router, SQLite (modernc.org/sqlite) or Postgres (pgx/v5), JWT, bcrypt, Swaggo, File Upload API |
+| **Frontend** | Vue 3, TypeScript, Tailwind CSS v4, Pinia, Vue Router, Axios, Vercel Blob Upload |
+| **Infrastructure** | Vite, HLS Streaming, Event Bus, Railway (Backend), Vercel (Frontend) |
 
 ## Project Structure
 
@@ -110,11 +110,11 @@ EduPulse/
 │   ├── docs/              # Swagger (auto-generated)
 │   ├── internal/
 │   │   ├── auth/          # JWT, password hashing, roles
-│   │   ├── db/            # SQLite, migrations, seed
+│   │   ├── db/            # SQLite, migrations, seed (SQLite + PostgreSQL)
 │   │   ├── events/        # event bus
-│   │   ├── http/          # router (chi), handlers
+│   │   ├── http/          # router (chi), handlers (homework, sessions, uploads)
 │   │   ├── middleware/     # JWT auth, RBAC
-│   │   ├── repo/          # repositories
+│   │   ├── repo/          # repositories (homework with attachments)
 │   │   ├── service/       # business logic
 │   │   └── workers/       # event consumers
 │   ├── uploads/           # images
@@ -122,11 +122,12 @@ EduPulse/
 │   └── hls/               # HLS streaming
 └── frontend/
     └── src/
-        ├── views/         # pages
+        ├── views/         # pages (HomeworkView with file upload, SessionDetailView)
         ├── layouts/       # layout with sidebar
-        ├── api/           # Axios client
+        ├── api/           # Axios client, Vercel Blob Upload
         ├── stores/        # Pinia (auth store)
-        └── router/        # Vue Router + guards
+        ├── router/        # Vue Router + guards
+        └── components/    # VideoUploader
 ```
 
 ## Student IDs
