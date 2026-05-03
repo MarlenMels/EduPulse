@@ -69,6 +69,7 @@ Opens at `http://localhost:5173`. The Vite dev server proxies API requests to th
 ## Production Deployment
 
 The backend runs on Railway, the frontend on Vercel.
+[text](https://edu-pulse-ashen.vercel.app/)
 
 ### Persisting data on Railway (SQLite)
 
@@ -127,3 +128,10 @@ EduPulse/
         ├── stores/        # Pinia (auth store)
         └── router/        # Vue Router + guards
 ```
+
+## Student IDs
+
+230103109 - Madi Zhazykenov
+230109011 - Yernar Bekbolatuly
+230103024 - Marlen Mels
+230103369 - Alisher Kudaibergen
