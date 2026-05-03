@@ -86,14 +86,8 @@ func (s *SessionService) ListForActor(ctx context.Context, actorID int64, role s
 	case auth.RoleAdmin, auth.RoleManager:
 		return s.repo.List(ctx, repo.SessionFilter{Limit: limit})
 	case auth.RoleTeacher:
-		ids, err := s.courseTeachers.CourseIDsByTeacher(ctx, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if len(ids) == 0 {
-			return []repo.SessionRow{}, nil
-		}
-		return s.repo.List(ctx, repo.SessionFilter{CourseIDs: ids, Limit: limit})
+		// TODO: Temporarily show all sessions for teachers (removed course relationship check)
+		return s.repo.List(ctx, repo.SessionFilter{Limit: limit})
 	case auth.RoleStudent:
 		ids, err := s.enrollments.CourseIDsByStudent(ctx, actorID)
 		if err != nil {
