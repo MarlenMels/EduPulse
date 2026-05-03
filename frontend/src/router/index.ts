@@ -133,6 +133,30 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/admin/courses',
+      component: () => import('@/layouts/AuthenticatedLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'course-members',
+          component: () => import('@/views/CourseMembersView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/teacher/students',
+      component: () => import('@/layouts/AuthenticatedLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'my-students',
+          component: () => import('@/views/MyStudentsView.vue'),
+        },
+      ],
+    },
   ],
 })
 

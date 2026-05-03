@@ -66,7 +66,7 @@ function goBack() {
           <div class="space-y-2 text-sm text-white/60">
             <div class="flex items-center gap-2">
               <Users class="w-4 h-4" />
-              <span>Teacher ID: {{ session.teacher_id }}</span>
+              <span>Course ID: {{ session.course_id }}</span>
             </div>
             <div class="flex items-center gap-2">
               <Clock class="w-4 h-4" />

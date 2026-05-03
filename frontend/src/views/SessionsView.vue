@@ -2,11 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { sessionsApi, coursesApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { CalendarDays, Plus, Clock, X, Trash2, GraduationCap } from 'lucide-vue-next'
+import { CalendarDays, Plus, Clock, X, Trash2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const sessions = ref<any[]>([])
-const courses = ref<any[]>([])
+const courses = ref<{ id: number; title: string }[]>([])
 const loading = ref(true)
 const error = ref('')
 const formError = ref('')
@@ -15,10 +15,12 @@ const creating = ref(false)
 const deletingId = ref<number | null>(null)
 const dateInput = ref<HTMLInputElement | null>(null)
 
+const canCreate = auth.isAdmin || auth.isManager || auth.isTeacher
+
 const newSession = ref({
+  course_id: 0,
   title: '',
   start_time: '',
-  course_id: null as number | null,
 })
 
 async function fetchSessions() {
@@ -34,10 +36,19 @@ async function fetchSessions() {
   }
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   formError.value = ''
-  newSession.value = { title: '', start_time: '', course_id: null }
+  newSession.value = { course_id: 0, title: '', start_time: '' }
   showCreateModal.value = true
+  try {
+    const res = await coursesApi.list({ limit: 200 })
+    courses.value = (res.data.items || []).map((c: any) => ({ id: c.id, title: c.title }))
+    if (courses.value.length === 1) {
+      newSession.value.course_id = courses.value[0]!.id
+    }
+  } catch {
+    // not fatal — user will see the empty list
+  }
 }
 
 function closeCreateModal() {
@@ -64,7 +75,7 @@ function selectedDateLabel() {
 async function createSession() {
   formError.value = ''
   if (!newSession.value.course_id) {
-    formError.value = 'Course is required'
+    formError.value = 'Choose a course'
     return
   }
   if (!newSession.value.title.trim()) {
@@ -81,23 +92,15 @@ async function createSession() {
   }
   creating.value = true
   try {
-    console.log('Creating session with data:', {
-      course_id: newSession.value.course_id,
-      title: newSession.value.title,
-      start_time: new Date(newSession.value.start_time).toISOString()
-    })
     await sessionsApi.create({
       course_id: newSession.value.course_id,
       title: newSession.value.title,
       start_time: new Date(newSession.value.start_time).toISOString(),
     })
-    console.log('Session created successfully')
     closeCreateModal()
-    newSession.value = { title: '', start_time: '', course_id: null }
+    newSession.value = { course_id: 0, title: '', start_time: '' }
     await fetchSessions()
   } catch (e: any) {
-    console.error('Failed to create session:', e)
-    console.error('Error response:', e.response?.data)
     formError.value = e.response?.data?.error || 'Failed to create'
   } finally {
     creating.value = false
@@ -128,22 +131,7 @@ function formatDate(dateStr: string) {
   })
 }
 
-async function fetchCourses() {
-  try {
-    console.log('Fetching courses...')
-    const res = await coursesApi.list({ limit: 100 })
-    console.log('Courses response:', res.data)
-    courses.value = res.data.items || []
-    console.log('Courses loaded:', courses.value.length)
-  } catch (e: any) {
-    console.error('Failed to load courses:', e)
-    console.error('Error response:', e.response?.data)
-  }
-}
-
-onMounted(async () => {
-  await Promise.all([fetchSessions(), fetchCourses()])
-})
+onMounted(fetchSessions)
 </script>
 
 <template>
@@ -199,7 +187,7 @@ onMounted(async () => {
                 <Clock class="w-3 h-3" />
                 {{ formatDate(session.start_time) }}
               </span>
-              <span>Teacher: {{ session.teacher_id || '—' }}</span>
+              <span>Course: {{ session.course_title || '—' }}</span>
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -233,18 +221,15 @@ onMounted(async () => {
               <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Course</label>
                 <select
-                  v-model="newSession.course_id"
+                  v-model.number="newSession.course_id"
                   class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
                 >
-                  <option :value="null" disabled>Select a course</option>
-                  <option
-                    v-for="course in courses"
-                    :key="course.id"
-                    :value="course.id"
-                  >
-                    {{ course.title }}
-                  </option>
+                  <option :value="0" class="bg-[#2D2D2D]">Select a course…</option>
+                  <option v-for="c in courses" :key="c.id" :value="c.id" class="bg-[#2D2D2D]">{{ c.title }}</option>
                 </select>
+                <p v-if="!courses.length" class="mt-1.5 text-xs text-white/40">
+                  You don't teach any courses yet. Ask an admin to assign you to one.
+                </p>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Title</label>

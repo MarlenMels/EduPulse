@@ -163,9 +163,18 @@ export const uploadsApi = {
 }
 
 // Sessions
+export interface SessionRow {
+  id: number
+  course_id: number
+  course_title: string
+  title: string
+  start_time: string
+  created_at: string
+}
+
 export const sessionsApi = {
   list: (params?: { limit?: number }) =>
-    api.get('/sessions', { params }),
+    api.get<{ items: SessionRow[]; count: number }>('/sessions', { params }),
   get: (id: number) => api.get(`/sessions/${id}`),
   create: (data: {
     course_id: number
@@ -173,6 +182,68 @@ export const sessionsApi = {
     start_time: string
   }) => api.post('/sessions', data),
   delete: (id: number) => api.delete(`/sessions/${id}`),
+}
+
+// Enrollments / teacher↔course management
+export interface CourseUser {
+  id: number
+  email: string
+  role: string
+  created_at: string
+}
+
+export const enrollmentsApi = {
+  teachers: (courseId: number) =>
+    api.get<{ items: CourseUser[]; count: number }>(`/courses/${courseId}/teachers`),
+  students: (courseId: number) =>
+    api.get<{ items: CourseUser[]; count: number }>(`/courses/${courseId}/students`),
+  addTeacher: (courseId: number, userId: number) =>
+    api.post(`/admin/courses/${courseId}/teachers`, { user_id: userId }),
+  removeTeacher: (courseId: number, teacherId: number) =>
+    api.delete(`/admin/courses/${courseId}/teachers/${teacherId}`),
+  enrollStudent: (courseId: number, userId: number) =>
+    api.post(`/admin/courses/${courseId}/students`, { user_id: userId }),
+  unenrollStudent: (courseId: number, studentId: number) =>
+    api.delete(`/admin/courses/${courseId}/students/${studentId}`),
+  myStudents: () =>
+    api.get<{ items: CourseUser[]; count: number }>('/teachers/me/students'),
+}
+
+// Assignments
+export interface AssignmentRow {
+  id: number
+  session_id: number
+  created_by: number
+  title: string
+  description: string
+  created_at: string
+  session_title: string
+  session_start_time: string
+  course_id: number
+  course_title: string
+  creator_email: string
+  submission_count: number
+}
+
+export interface SubmissionRow {
+  id: number
+  assignment_id: number
+  student_id: number
+  content: string
+  attachments: string
+  status: string
+  created_at: string
+  student_email: string
+}
+
+export const assignmentsApi = {
+  list: (params?: { limit?: number }) =>
+    api.get<{ items: AssignmentRow[]; count: number }>('/assignments', { params }),
+  create: (data: { session_id: number; title: string; description?: string }) =>
+    api.post('/assignments', data),
+  delete: (id: number) => api.delete(`/assignments/${id}`),
+  submissions: (id: number) =>
+    api.get<{ items: SubmissionRow[]; count: number }>(`/assignments/${id}/submissions`),
 }
 
 // Courses
@@ -219,14 +290,27 @@ export const coursesApi = {
     api.delete(`/lessons/${lessonId}/assets/${assetId}`),
 }
 
-// Homework
+// Homework — student-side
+export interface MineRow {
+  id: number
+  assignment_id: number
+  student_id: number
+  content: string
+  attachments: string
+  status: string
+  created_at: string
+  assignment_title: string
+  session_id: number
+  session_title: string
+  course_id: number
+  course_title: string
+}
+
 export const homeworkApi = {
-  submit: (data: { session_id: number; content: string; attachments?: string }) =>
+  submit: (data: { assignment_id: number; content: string; attachments?: string }) =>
     api.post('/homework/submit', data),
-  list: (params?: { session_id?: number; student_id?: number; status?: string; limit?: number }) =>
-    api.get('/homework', { params }),
-  mine: (params?: { status?: string; limit?: number }) =>
-    api.get('/homework/mine', { params }),
+  mine: (params?: { limit?: number }) =>
+    api.get<{ items: MineRow[]; count: number }>('/homework/mine', { params }),
   updateStatus: (id: number, status: string) =>
     api.patch(`/homework/${id}/status`, { status }),
 }

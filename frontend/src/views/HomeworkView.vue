@@ -1,40 +1,74 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { homeworkApi, sessionsApi, uploadsApi, resolveMediaUrl } from '@/api/client'
+import { ref, computed, onMounted } from 'vue'
+import {
+  assignmentsApi,
+  homeworkApi,
+  sessionsApi,
+  type AssignmentRow,
+  type SubmissionRow,
+  type MineRow,
+  type SessionRow,
+} from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { BookOpen, Send, CheckCircle, Clock, AlertCircle, X, Paperclip, Upload } from 'lucide-vue-next'
+import { BookOpen, Plus, X, Loader2, Eye } from 'lucide-vue-next'
 
 const auth = useAuthStore()
-const homework = ref<any[]>([])
-const sessions = ref<any[]>([])
+
+const role = computed(() => auth.userRole)
+const isStaff = computed(() => auth.isAdmin || auth.isManager || auth.isTeacher)
+const isStudent = computed(() => auth.isStudent)
+
 const loading = ref(true)
 const error = ref('')
-const showSubmitModal = ref(false)
+
+// Staff view: list of assignments
+const assignments = ref<AssignmentRow[]>([])
+
+// Student view: own submissions + assignments to choose from
+const mine = ref<MineRow[]>([])
+const studentAssignments = ref<AssignmentRow[]>([])
+
+// Modal: create assignment (staff)
+const showCreate = ref(false)
+const sessions = ref<SessionRow[]>([])
+const newAssignment = ref({ session_id: 0, title: '', description: '' })
+const creating = ref(false)
+const createError = ref('')
+
+// Modal: view submissions (staff)
+const showSubs = ref(false)
+const subsAssignment = ref<AssignmentRow | null>(null)
+const submissions = ref<SubmissionRow[]>([])
+const subsLoading = ref(false)
+
+// Modal: submit homework (student)
+const showSubmit = ref(false)
+const submitTarget = ref<AssignmentRow | null>(null)
+const submission = ref({ content: '' })
 const submitting = ref(false)
-const uploadingFiles = ref(false)
-const attachments = ref<any[]>([])
+const submitError = ref('')
 
-const newHomework = ref({ session_id: '', content: '', attachments: '' })
-
-async function fetchSessions() {
-  try {
-    const res = await sessionsApi.list({ limit: 100 })
-    sessions.value = res.data.items || []
-  } catch (e: any) {
-    console.error('Failed to load sessions:', e)
-  }
+const statusStyle: Record<string, string> = {
+  submitted: 'bg-cyan-400/10 text-cyan-400',
+  accepted: 'bg-green-400/10 text-green-400',
+  rejected: 'bg-red-400/10 text-red-400',
+  needs_fix: 'bg-amber-400/10 text-amber-400',
 }
 
-async function fetchHomework() {
+async function fetchAll() {
   loading.value = true
   error.value = ''
   try {
-    if (auth.isStudent || auth.isParent) {
-      const res = await homeworkApi.mine({ limit: 50 })
-      homework.value = res.data.items || []
+    if (isStudent.value) {
+      const [m, a] = await Promise.all([
+        homeworkApi.mine({ limit: 100 }),
+        assignmentsApi.list({ limit: 100 }),
+      ])
+      mine.value = m.data.items || []
+      studentAssignments.value = a.data.items || []
     } else {
-      const res = await homeworkApi.list({ limit: 50 })
-      homework.value = res.data.items || []
+      const a = await assignmentsApi.list({ limit: 200 })
+      assignments.value = a.data.items || []
     }
   } catch (e: any) {
     error.value = e.response?.data?.error || 'Failed to load'
@@ -43,108 +77,104 @@ async function fetchHomework() {
   }
 }
 
-async function handleFileUpload(event: Event) {
-  const target = event.target as HTMLInputElement
-  if (!target.files || target.files.length === 0) return
-  
-  uploadingFiles.value = true
-  const files = Array.from(target.files)
-  
+async function openCreate() {
+  createError.value = ''
+  newAssignment.value = { session_id: 0, title: '', description: '' }
+  showCreate.value = true
   try {
-    for (const file of files) {
-      const res = await uploadsApi.upload(file)
-      attachments.value.push({
-        url: res.data.url,
-        name: res.data.name,
-        size: res.data.size
-      })
-    }
-  } catch (e: any) {
-    error.value = e.response?.data?.error || 'Failed to upload files'
-  } finally {
-    uploadingFiles.value = false
-    target.value = ''
+    const res = await sessionsApi.list({ limit: 200 })
+    sessions.value = res.data.items || []
+  } catch {
+    sessions.value = []
   }
 }
 
-function removeAttachment(index: number) {
-  attachments.value.splice(index, 1)
+async function createAssignment() {
+  createError.value = ''
+  if (!newAssignment.value.session_id) {
+    createError.value = 'Choose a session'
+    return
+  }
+  if (!newAssignment.value.title.trim()) {
+    createError.value = 'Title is required'
+    return
+  }
+  creating.value = true
+  try {
+    await assignmentsApi.create({
+      session_id: newAssignment.value.session_id,
+      title: newAssignment.value.title.trim(),
+      description: newAssignment.value.description.trim(),
+    })
+    showCreate.value = false
+    await fetchAll()
+  } catch (e: any) {
+    createError.value = e.response?.data?.error || 'Failed to create'
+  } finally {
+    creating.value = false
+  }
+}
+
+async function openSubs(a: AssignmentRow) {
+  subsAssignment.value = a
+  showSubs.value = true
+  subsLoading.value = true
+  submissions.value = []
+  try {
+    const res = await assignmentsApi.submissions(a.id)
+    submissions.value = res.data.items || []
+  } catch (e: any) {
+    error.value = e.response?.data?.error || 'Failed to load submissions'
+  } finally {
+    subsLoading.value = false
+  }
+}
+
+async function setStatus(s: SubmissionRow, status: string) {
+  try {
+    await homeworkApi.updateStatus(s.id, status)
+    s.status = status
+  } catch (e: any) {
+    alert(e.response?.data?.error || 'Failed to update')
+  }
+}
+
+function openSubmit(a: AssignmentRow) {
+  submitTarget.value = a
+  submission.value = { content: '' }
+  submitError.value = ''
+  showSubmit.value = true
 }
 
 async function submitHomework() {
-  console.log('Submit homework called:', {
-    content: newHomework.value.content,
-    contentTrimmed: newHomework.value.content.trim(),
-    sessionId: newHomework.value.session_id,
-    attachments: attachments.value
-  })
-  
-  if (!newHomework.value.content.trim() || !newHomework.value.session_id) {
-    console.log('Validation failed - content or session_id missing')
+  if (!submitTarget.value) return
+  submitError.value = ''
+  if (!submission.value.content.trim()) {
+    submitError.value = 'Answer is required'
     return
   }
-  
   submitting.value = true
   try {
-    const attachmentsJson = attachments.value.length > 0 ? JSON.stringify(attachments.value) : ''
     await homeworkApi.submit({
-      session_id: Number(newHomework.value.session_id),
-      content: newHomework.value.content,
-      attachments: attachmentsJson
+      assignment_id: submitTarget.value.id,
+      content: submission.value.content.trim(),
     })
-    showSubmitModal.value = false
-    newHomework.value = { session_id: '', content: '', attachments: '' }
-    attachments.value = []
-    await fetchHomework()
+    showSubmit.value = false
+    await fetchAll()
   } catch (e: any) {
-    error.value = e.response?.data?.error || 'Failed to submit'
+    submitError.value = e.response?.data?.error || 'Failed to submit'
   } finally {
     submitting.value = false
   }
 }
 
-async function updateStatus(id: number, status: string) {
-  try {
-    await homeworkApi.updateStatus(id, status)
-    await fetchHomework()
-  } catch (e: any) {
-    error.value = e.response?.data?.error || 'Failed to update'
-  }
-}
+const submittedAssignmentIds = computed(() => new Set(mine.value.map((m) => m.assignment_id)))
 
-function statusColor(status: string) {
-  switch (status) {
-    case 'approved': return 'text-green-400 bg-green-400/10'
-    case 'accepted': return 'text-green-400 bg-green-400/10'
-    case 'rejected': return 'text-red-400 bg-red-400/10'
-    case 'pending': return 'text-yellow-400 bg-yellow-400/10'
-    case 'submitted': return 'text-yellow-400 bg-yellow-400/10'
-    case 'needs_fix': return 'text-orange-400 bg-orange-400/10'
-    default: return 'text-white/40 bg-white/5'
-  }
-}
+const pendingAssignments = computed(() =>
+  studentAssignments.value.filter((a) => !submittedAssignmentIds.value.has(a.id)),
+)
 
-function statusLabel(status: string) {
-  switch (status) {
-    case 'approved': return 'Approved'
-    case 'accepted': return 'Accepted'
-    case 'rejected': return 'Rejected'
-    case 'pending': return 'Pending'
-    case 'submitted': return 'Submitted'
-    case 'needs_fix': return 'Needs Fix'
-    default: return status
-  }
-}
-
-onMounted(async () => {
-  await fetchSessions()
-  await fetchHomework()
-})
-
-async function openSubmitModal() {
-  await fetchSessions()
-  showSubmitModal.value = true
-}
+onMounted(fetchAll)
 </script>
 
 <template>
@@ -152,165 +182,227 @@ async function openSubmitModal() {
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <h1 class="text-2xl font-extrabold text-cyan-400">Homework</h1>
       <button
-        v-if="auth.isStudent"
-        @click="openSubmitModal"
-        class="flex items-center gap-2 px-4 py-2.5 bg-cyan-400 text-black font-semibold text-sm rounded-xl hover:bg-cyan-300 transition-colors"
+        v-if="isStaff"
+        @click="openCreate"
+        class="flex items-center gap-2 px-4 py-2.5 bg-cyan-400 text-[#121212] font-semibold text-sm rounded-xl hover:bg-cyan-300 transition-colors"
       >
-        <Send class="w-4 h-4" />
-        Submit Work
+        <Plus class="w-4 h-4" /> New assignment
       </button>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+    <p v-if="error" class="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{{ error }}</p>
+
+    <div v-if="loading" class="flex items-center gap-2 text-white/60 text-sm">
+      <Loader2 class="w-4 h-4 animate-spin" /> Loading…
     </div>
 
-    <div v-else-if="error" class="text-center py-16">
-      <p class="text-red-400 mb-4">{{ error }}</p>
-      <button @click="fetchHomework" class="px-4 py-2 bg-cyan-400 text-black rounded-lg font-semibold text-sm">Retry</button>
-    </div>
-
-    <div v-else-if="homework.length === 0" class="text-center py-16 text-white/40">
-      <BookOpen class="w-16 h-16 mx-auto mb-4 opacity-30" />
-      <p>No homework yet</p>
-    </div>
-
-    <div v-else class="space-y-3">
-      <div
-        v-for="hw in homework"
-        :key="hw.id"
-        class="bg-[#1E1E1E] rounded-2xl p-5 border border-white/5"
-      >
-        <div class="flex items-start gap-4">
-          <div class="w-11 h-11 rounded-xl bg-purple-400/10 flex items-center justify-center shrink-0">
-            <BookOpen class="w-5 h-5 text-purple-400" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <h3 class="font-bold text-white">Homework #{{ hw.id }}</h3>
-              <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="statusColor(hw.status)">
-                {{ statusLabel(hw.status) }}
+    <!-- STAFF VIEW: assignments table -->
+    <div v-else-if="isStaff" class="overflow-hidden bg-[#1E1E1E] border border-white/5 rounded-2xl">
+      <table class="w-full text-sm">
+        <thead class="bg-white/5 text-left text-xs uppercase tracking-wider text-white/40">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Title</th>
+            <th class="px-5 py-3 font-semibold">Course</th>
+            <th class="px-5 py-3 font-semibold">Session</th>
+            <th v-if="role === 'admin' || role === 'manager'" class="px-5 py-3 font-semibold">Teacher</th>
+            <th class="px-5 py-3 font-semibold">Submissions</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="a in assignments" :key="a.id" class="border-t border-white/5 text-white/80">
+            <td class="px-5 py-3 font-medium">{{ a.title }}</td>
+            <td class="px-5 py-3">{{ a.course_title }}</td>
+            <td class="px-5 py-3 text-white/60">{{ a.session_title }}</td>
+            <td v-if="role === 'admin' || role === 'manager'" class="px-5 py-3 text-white/60">{{ a.creator_email }}</td>
+            <td class="px-5 py-3">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-white/10 text-white/70">
+                {{ a.submission_count }}
               </span>
-            </div>
-            <p class="text-sm text-white/60 mt-1 line-clamp-2">{{ hw.content }}</p>
-            <div v-if="hw.attachments" class="mt-2">
-              <div class="flex flex-wrap gap-2">
-                <a 
-                  v-for="(attachment, index) in JSON.parse(hw.attachments || '[]')" 
-                  :key="index"
-                  :href="resolveMediaUrl(attachment.url)"
-                  :download="attachment.name"
-                  target="_blank"
-                  class="inline-flex items-center gap-1 px-2 py-1 bg-[#2D2D2D] rounded-lg text-xs text-cyan-400 hover:bg-[#3D3D3D] transition-colors cursor-pointer"
+            </td>
+            <td class="px-5 py-3 text-right">
+              <button
+                @click="openSubs(a)"
+                class="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-semibold"
+              >
+                <Eye class="w-4 h-4" /> View
+              </button>
+            </td>
+          </tr>
+          <tr v-if="!assignments.length">
+            <td :colspan="role === 'admin' || role === 'manager' ? 6 : 5" class="px-5 py-8 text-center text-white/40 text-sm">
+              No assignments yet.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- STUDENT VIEW -->
+    <div v-else-if="isStudent" class="space-y-6">
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-wider text-white/50 mb-3">To do</h2>
+        <div v-if="!pendingAssignments.length" class="text-white/40 text-sm">All caught up.</div>
+        <div v-else class="grid sm:grid-cols-2 gap-3">
+          <div
+            v-for="a in pendingAssignments"
+            :key="a.id"
+            class="p-4 bg-[#1E1E1E] border border-white/5 rounded-2xl"
+          >
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-xl bg-cyan-400/10 flex items-center justify-center shrink-0">
+                <BookOpen class="w-5 h-5 text-cyan-400" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-white">{{ a.title }}</div>
+                <div class="text-xs text-white/40 mt-1">{{ a.course_title }} · {{ a.session_title }}</div>
+                <p v-if="a.description" class="text-sm text-white/60 mt-2 line-clamp-2">{{ a.description }}</p>
+                <button
+                  @click="openSubmit(a)"
+                  class="mt-3 px-3.5 py-1.5 rounded-lg bg-cyan-400 text-black font-semibold text-xs hover:bg-cyan-300 transition-colors"
                 >
-                  <Paperclip class="w-3 h-3" />
-                  {{ attachment.name }}
-                </a>
+                  Submit
+                </button>
               </div>
             </div>
-            <p class="text-xs text-white/30 mt-2">Session: {{ hw.session_id }} · Student: {{ hw.student_id }}</p>
           </div>
+        </div>
+      </div>
 
-          <!-- Teacher actions -->
-          <div v-if="auth.isTeacher && (hw.status === 'pending' || hw.status === 'submitted')" class="flex gap-2 shrink-0">
-            <button
-              @click="updateStatus(hw.id, 'accepted')"
-              class="w-9 h-9 rounded-lg bg-green-400/10 flex items-center justify-center hover:bg-green-400/20 transition-colors"
-              title="Approve"
-            >
-              <CheckCircle class="w-4 h-4 text-green-400" />
-            </button>
-            <button
-              @click="updateStatus(hw.id, 'rejected')"
-              class="w-9 h-9 rounded-lg bg-red-400/10 flex items-center justify-center hover:bg-red-400/20 transition-colors"
-              title="Reject"
-            >
-              <AlertCircle class="w-4 h-4 text-red-400" />
-            </button>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-wider text-white/50 mb-3">Submitted</h2>
+        <div v-if="!mine.length" class="text-white/40 text-sm">Nothing submitted yet.</div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="m in mine"
+            :key="m.id"
+            class="p-4 bg-[#1E1E1E] border border-white/5 rounded-2xl flex items-start gap-3"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-white">{{ m.assignment_title }}</div>
+              <div class="text-xs text-white/40">{{ m.course_title }} · {{ m.session_title }}</div>
+              <p class="text-sm text-white/70 mt-2 whitespace-pre-wrap">{{ m.content }}</p>
+            </div>
+            <span
+              class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold shrink-0"
+              :class="statusStyle[m.status] || 'bg-white/10 text-white/60'"
+            >{{ m.status }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Submit modal -->
+    <div v-else class="text-white/40 text-sm">No homework view for your role.</div>
+
     <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showSubmitModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" @click.self="showSubmitModal = false">
-          <div class="bg-[#1E1E1E] rounded-t-3xl sm:rounded-2xl w-full max-w-md p-6">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-lg font-extrabold text-white">Submit Work</h2>
-              <button @click="showSubmitModal = false" class="text-white/40 hover:text-white">
-                <X class="w-5 h-5" />
-              </button>
+      <!-- Create assignment modal -->
+      <div v-if="showCreate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="showCreate = false">
+        <div class="w-full max-w-lg bg-[#1E1E1E] border border-white/10 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-extrabold text-white">New assignment</h2>
+            <button @click="showCreate = false" class="text-white/40 hover:text-white"><X class="w-5 h-5" /></button>
+          </div>
+          <form @submit.prevent="createAssignment" class="space-y-4">
+            <p v-if="createError" class="rounded-xl bg-red-400/10 px-4 py-3 text-sm text-red-400">{{ createError }}</p>
+            <div>
+              <label class="block text-xs font-semibold text-white/60 mb-1.5">Session</label>
+              <select
+                v-model.number="newAssignment.session_id"
+                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-white/10 focus:border-cyan-400 focus:outline-none"
+              >
+                <option :value="0" class="bg-[#2D2D2D]">Select a session…</option>
+                <option v-for="s in sessions" :key="s.id" :value="s.id" class="bg-[#2D2D2D]">
+                  {{ s.course_title }} — {{ s.title }}
+                </option>
+              </select>
+              <p v-if="!sessions.length" class="mt-1.5 text-xs text-white/40">No sessions available.</p>
             </div>
-            <form @submit.prevent="submitHomework" class="space-y-4">
-              <div>
-                <label class="block text-sm font-semibold text-white/70 mb-1.5">Session</label>
-                <select v-model="newHomework.session_id" class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none">
-                  <option value="" disabled>Select a session</option>
-                  <option v-for="session in sessions" :key="session.id" :value="session.id">
-                    {{ session.title }}
-                  </option>
-                </select>
+            <div>
+              <label class="block text-xs font-semibold text-white/60 mb-1.5">Title</label>
+              <input
+                v-model="newAssignment.title"
+                maxlength="200"
+                placeholder="e.g. Read chapter 4 and answer 3 questions"
+                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-white/10 focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-white/60 mb-1.5">Description (optional)</label>
+              <textarea
+                v-model="newAssignment.description"
+                rows="3"
+                maxlength="5000"
+                placeholder="Optional details for the students"
+                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-white/10 focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+            <button type="submit" :disabled="creating" class="w-full py-3 rounded-xl bg-cyan-400 text-[#121212] font-bold text-sm hover:bg-cyan-300 disabled:opacity-50 transition-colors">
+              {{ creating ? 'Creating…' : 'Create' }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- View submissions modal -->
+      <div v-if="showSubs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="showSubs = false">
+        <div class="w-full max-w-2xl max-h-[85vh] overflow-auto bg-[#1E1E1E] border border-white/10 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="text-lg font-extrabold text-white">{{ subsAssignment?.title }}</h2>
+              <p class="text-xs text-white/40 mt-1">{{ subsAssignment?.course_title }} · {{ subsAssignment?.session_title }}</p>
+            </div>
+            <button @click="showSubs = false" class="text-white/40 hover:text-white"><X class="w-5 h-5" /></button>
+          </div>
+          <div v-if="subsLoading" class="text-white/60 text-sm flex items-center gap-2"><Loader2 class="w-4 h-4 animate-spin" /> Loading…</div>
+          <div v-else-if="!submissions.length" class="text-white/40 text-sm">No submissions yet.</div>
+          <div v-else class="space-y-3">
+            <div v-for="s in submissions" :key="s.id" class="p-4 bg-[#2D2D2D] rounded-xl">
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <span class="font-semibold text-white">{{ s.student_email }}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold" :class="statusStyle[s.status] || 'bg-white/10 text-white/60'">
+                  {{ s.status }}
+                </span>
               </div>
-              <div>
-                <label class="block text-sm font-semibold text-white/70 mb-1.5">Content</label>
-                <textarea v-model="newHomework.content" rows="4" placeholder="Describe your completed work..." class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-transparent focus:border-cyan-400 focus:outline-none resize-none" />
+              <p class="text-sm text-white/70 whitespace-pre-wrap">{{ s.content }}</p>
+              <div class="flex gap-2 mt-3">
+                <button @click="setStatus(s, 'accepted')" class="px-3 py-1.5 rounded-lg bg-green-400/10 text-green-400 text-xs font-semibold hover:bg-green-400/20">Accept</button>
+                <button @click="setStatus(s, 'needs_fix')" class="px-3 py-1.5 rounded-lg bg-amber-400/10 text-amber-400 text-xs font-semibold hover:bg-amber-400/20">Needs fix</button>
+                <button @click="setStatus(s, 'rejected')" class="px-3 py-1.5 rounded-lg bg-red-400/10 text-red-400 text-xs font-semibold hover:bg-red-400/20">Reject</button>
               </div>
-              
-              <div>
-                <label class="block text-sm font-semibold text-white/70 mb-1.5">Attachments</label>
-                <div class="space-y-2">
-                  <div class="relative">
-                    <input 
-                      type="file" 
-                      multiple 
-                      @change="handleFileUpload"
-                      :disabled="uploadingFiles"
-                      accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip"
-                      class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-400 file:text-black hover:file:bg-cyan-300 disabled:opacity-50 cursor-pointer"
-                    />
-                    <div v-if="uploadingFiles" class="absolute inset-0 flex items-center justify-center bg-[#2D2D2D]/80 rounded-xl">
-                      <div class="w-6 h-6 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
-                    </div>
-                  </div>
-                  
-                  <div v-if="attachments.length > 0" class="space-y-2">
-                    <div 
-                      v-for="(attachment, index) in attachments" 
-                      :key="index"
-                      class="flex items-center gap-3 p-3 bg-[#2D2D2D] rounded-lg"
-                    >
-                      <Paperclip class="w-4 h-4 text-cyan-400" />
-                      <span class="flex-1 text-sm text-white truncate">{{ attachment.name }}</span>
-                      <button
-                        @click="removeAttachment(index)"
-                        class="w-6 h-6 rounded-lg bg-red-400/10 flex items-center justify-center hover:bg-red-400/20 transition-colors"
-                        title="Remove file"
-                      >
-                        <X class="w-3 h-3 text-red-400" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <p class="text-xs text-white/40">Supported formats: Images, PDF, DOC, TXT, ZIP (max 50MB per file)</p>
-                </div>
-              </div>
-              <div class="flex gap-3 pt-2">
-                <button type="button" @click="showSubmitModal = false" class="flex-1 py-3 rounded-xl text-white/60 font-semibold text-sm hover:bg-white/5 transition-colors">Cancel</button>
-                <button type="submit" :disabled="submitting" class="flex-1 py-3 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300 disabled:opacity-50 transition-colors">
-                  {{ submitting ? 'Submitting...' : 'Submit' }}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
-      </Transition>
+      </div>
+
+      <!-- Submit homework modal -->
+      <div v-if="showSubmit" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="showSubmit = false">
+        <div class="w-full max-w-lg bg-[#1E1E1E] border border-white/10 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="text-lg font-extrabold text-white">{{ submitTarget?.title }}</h2>
+              <p class="text-xs text-white/40 mt-1">{{ submitTarget?.course_title }} · {{ submitTarget?.session_title }}</p>
+            </div>
+            <button @click="showSubmit = false" class="text-white/40 hover:text-white"><X class="w-5 h-5" /></button>
+          </div>
+          <p v-if="submitTarget?.description" class="text-sm text-white/60 mb-4 whitespace-pre-wrap">{{ submitTarget.description }}</p>
+          <form @submit.prevent="submitHomework" class="space-y-4">
+            <p v-if="submitError" class="rounded-xl bg-red-400/10 px-4 py-3 text-sm text-red-400">{{ submitError }}</p>
+            <div>
+              <label class="block text-xs font-semibold text-white/60 mb-1.5">Your answer</label>
+              <textarea
+                v-model="submission.content"
+                rows="6"
+                maxlength="5000"
+                placeholder="Type your answer here…"
+                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm placeholder-white/30 border border-white/10 focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+            <button type="submit" :disabled="submitting" class="w-full py-3 rounded-xl bg-cyan-400 text-[#121212] font-bold text-sm hover:bg-cyan-300 disabled:opacity-50 transition-colors">
+              {{ submitting ? 'Submitting…' : 'Submit' }}
+            </button>
+          </form>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
-
-<style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-</style>
