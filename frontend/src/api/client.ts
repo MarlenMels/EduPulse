@@ -156,24 +156,9 @@ export const usersApi = {
 
 export const uploadsApi = {
   upload: async (file: File) => {
-    if (shouldUseBlobUploads()) {
-      try {
-        return { data: await uploadToBlob('materials', file) }
-      } catch (error: any) {
-        console.warn('Blob upload failed, falling back to backend upload:', error)
-        // Fallback to backend upload
-        const fd = new FormData()
-        fd.append('file', file)
-        return api.post<{ url: string; name: string; size: number }>('/uploads', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-      }
-    }
-    const fd = new FormData()
-    fd.append('file', file)
-    return api.post<{ url: string; name: string; size: number }>('/uploads', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    // Force blob upload for testing
+    console.log('Uploading file via blob:', file.name)
+    return { data: await uploadToBlob('materials', file) }
   },
 }
 
