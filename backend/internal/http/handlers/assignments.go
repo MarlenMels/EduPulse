@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -79,7 +80,8 @@ func (h *AssignmentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.svc.ListForActor(r.Context(), uid, role, limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db error")
+		log.Printf("assignments.List uid=%d role=%s: %v", uid, role, err)
+		writeError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
@@ -101,7 +103,8 @@ func (h *AssignmentHandler) Submissions(w http.ResponseWriter, r *http.Request) 
 	}
 	items, err := h.manage.Submissions(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db error")
+		log.Printf("assignments.Submissions id=%d: %v", id, err)
+		writeError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
