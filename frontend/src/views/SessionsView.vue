@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { sessionsApi } from '@/api/client'
+import { sessionsApi, coursesApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { CalendarDays, Plus, Clock, X, Trash2 } from 'lucide-vue-next'
+import { CalendarDays, Plus, Clock, X, Trash2, GraduationCap } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const sessions = ref<any[]>([])
+const courses = ref<any[]>([])
 const loading = ref(true)
 const error = ref('')
 const formError = ref('')
@@ -17,6 +18,7 @@ const dateInput = ref<HTMLInputElement | null>(null)
 const newSession = ref({
   title: '',
   start_time: '',
+  course_id: null as number | null,
 })
 
 async function fetchSessions() {
@@ -34,7 +36,7 @@ async function fetchSessions() {
 
 function openCreateModal() {
   formError.value = ''
-  newSession.value = { title: '', start_time: '' }
+  newSession.value = { title: '', start_time: '', course_id: null }
   showCreateModal.value = true
 }
 
@@ -61,6 +63,10 @@ function selectedDateLabel() {
 
 async function createSession() {
   formError.value = ''
+  if (!newSession.value.course_id) {
+    formError.value = 'Course is required'
+    return
+  }
   if (!newSession.value.title.trim()) {
     formError.value = 'Title is required'
     return
@@ -76,11 +82,12 @@ async function createSession() {
   creating.value = true
   try {
     await sessionsApi.create({
+      course_id: newSession.value.course_id,
       title: newSession.value.title,
       start_time: new Date(newSession.value.start_time).toISOString(),
     })
     closeCreateModal()
-    newSession.value = { title: '', start_time: '' }
+    newSession.value = { title: '', start_time: '', course_id: null }
     await fetchSessions()
   } catch (e: any) {
     formError.value = e.response?.data?.error || 'Failed to create'
@@ -113,7 +120,18 @@ function formatDate(dateStr: string) {
   })
 }
 
-onMounted(fetchSessions)
+async function fetchCourses() {
+  try {
+    const res = await coursesApi.list({ limit: 100 })
+    courses.value = res.data.items || []
+  } catch (e: any) {
+    console.error('Failed to load courses:', e)
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([fetchSessions(), fetchCourses()])
+})
 </script>
 
 <template>
@@ -200,6 +218,22 @@ onMounted(fetchSessions)
 
             <form @submit.prevent="createSession" class="space-y-4">
               <p v-if="formError" class="rounded-xl bg-red-400/10 px-4 py-3 text-sm text-red-400">{{ formError }}</p>
+              <div>
+                <label class="block text-sm font-semibold text-white/70 mb-1.5">Course</label>
+                <select
+                  v-model="newSession.course_id"
+                  class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-transparent focus:border-cyan-400 focus:outline-none"
+                >
+                  <option :value="null" disabled>Select a course</option>
+                  <option
+                    v-for="course in courses"
+                    :key="course.id"
+                    :value="course.id"
+                  >
+                    {{ course.title }}
+                  </option>
+                </select>
+              </div>
               <div>
                 <label class="block text-sm font-semibold text-white/70 mb-1.5">Title</label>
                 <input

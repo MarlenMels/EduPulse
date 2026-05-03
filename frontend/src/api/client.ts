@@ -168,7 +168,7 @@ export const sessionsApi = {
     api.get('/sessions', { params }),
   get: (id: number) => api.get(`/sessions/${id}`),
   create: (data: {
-    teacher_id?: number
+    course_id: number
     title: string
     start_time: string
   }) => api.post('/sessions', data),
