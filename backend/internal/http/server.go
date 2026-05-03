@@ -139,6 +139,7 @@ func NewServer(d Deps) *Server {
 		r.Post("/assignments", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Create)).ServeHTTP)
 		r.Get("/assignments", assignmentH.List)
 		r.Get("/assignments/{id}/submissions", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Submissions)).ServeHTTP)
+		r.Put("/assignments/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Update)).ServeHTTP)
 		r.Delete("/assignments/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(assignmentH.Delete)).ServeHTTP)
 
 		// Enrollments and teacher↔course management (admin/manager only for mutations).

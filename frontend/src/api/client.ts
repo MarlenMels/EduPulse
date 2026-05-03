@@ -241,6 +241,8 @@ export const assignmentsApi = {
     api.get<{ items: AssignmentRow[]; count: number }>('/assignments', { params }),
   create: (data: { session_id: number; title: string; description?: string }) =>
     api.post('/assignments', data),
+  update: (id: number, data: { title: string; description?: string }) =>
+    api.put<AssignmentRow>(`/assignments/${id}`, data),
   delete: (id: number) => api.delete(`/assignments/${id}`),
   submissions: (id: number) =>
     api.get<{ items: SubmissionRow[]; count: number }>(`/assignments/${id}/submissions`),

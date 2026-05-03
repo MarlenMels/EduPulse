@@ -107,6 +107,49 @@ func (h *AssignmentHandler) Submissions(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
 }
 
+type updateAssignmentReq struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+// Update godoc
+// @Summary      Update an assignment (title/description)
+// @Tags         Assignments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path  int                  true  "Assignment ID"
+// @Param        body  body  updateAssignmentReq  true  "Updated fields"
+// @Success      200   {object}  repo.Assignment
+// @Router       /assignments/{id} [put]
+func (h *AssignmentHandler) Update(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.RoleFromContext(r.Context())
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if id <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req updateAssignmentReq
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, badJSONMessage(err))
+		return
+	}
+	updated, err := h.svc.Update(r.Context(), uid, role, id, service.UpdateAssignmentInput{
+		Title:       req.Title,
+		Description: req.Description,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 // Delete godoc
 // @Summary      Delete an assignment
 // @Tags         Assignments

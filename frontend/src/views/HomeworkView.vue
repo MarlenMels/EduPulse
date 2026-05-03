@@ -10,7 +10,7 @@ import {
   type SessionRow,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { BookOpen, Plus, X, Loader2, Eye } from 'lucide-vue-next'
+import { BookOpen, Plus, X, Loader2, Eye, Pencil, Trash2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
@@ -28,8 +28,9 @@ const assignments = ref<AssignmentRow[]>([])
 const mine = ref<MineRow[]>([])
 const studentAssignments = ref<AssignmentRow[]>([])
 
-// Modal: create assignment (staff)
+// Modal: create OR edit assignment (staff)
 const showCreate = ref(false)
+const editingId = ref<number | null>(null)
 const sessions = ref<SessionRow[]>([])
 const newAssignment = ref({ session_id: 0, title: '', description: '' })
 const creating = ref(false)
@@ -78,6 +79,7 @@ async function fetchAll() {
 }
 
 async function openCreate() {
+  editingId.value = null
   createError.value = ''
   newAssignment.value = { session_id: 0, title: '', description: '' }
   showCreate.value = true
@@ -89,9 +91,24 @@ async function openCreate() {
   }
 }
 
-async function createAssignment() {
+function openEdit(a: AssignmentRow) {
+  editingId.value = a.id
   createError.value = ''
-  if (!newAssignment.value.session_id) {
+  newAssignment.value = { session_id: a.session_id, title: a.title, description: a.description }
+  sessions.value = [{
+    id: a.session_id,
+    course_id: a.course_id,
+    course_title: a.course_title,
+    title: a.session_title,
+    start_time: a.session_start_time,
+    created_at: '',
+  }]
+  showCreate.value = true
+}
+
+async function saveAssignment() {
+  createError.value = ''
+  if (!editingId.value && !newAssignment.value.session_id) {
     createError.value = 'Choose a session'
     return
   }
@@ -101,17 +118,34 @@ async function createAssignment() {
   }
   creating.value = true
   try {
-    await assignmentsApi.create({
-      session_id: newAssignment.value.session_id,
-      title: newAssignment.value.title.trim(),
-      description: newAssignment.value.description.trim(),
-    })
+    if (editingId.value) {
+      await assignmentsApi.update(editingId.value, {
+        title: newAssignment.value.title.trim(),
+        description: newAssignment.value.description.trim(),
+      })
+    } else {
+      await assignmentsApi.create({
+        session_id: newAssignment.value.session_id,
+        title: newAssignment.value.title.trim(),
+        description: newAssignment.value.description.trim(),
+      })
+    }
     showCreate.value = false
     await fetchAll()
   } catch (e: any) {
-    createError.value = e.response?.data?.error || 'Failed to create'
+    createError.value = e.response?.data?.error || 'Failed to save'
   } finally {
     creating.value = false
+  }
+}
+
+async function deleteAssignment(a: AssignmentRow) {
+  if (!confirm(`Delete assignment "${a.title}"? All submissions will be removed.`)) return
+  try {
+    await assignmentsApi.delete(a.id)
+    assignments.value = assignments.value.filter((x) => x.id !== a.id)
+  } catch (e: any) {
+    alert(e.response?.data?.error || 'Failed to delete')
   }
 }
 
@@ -221,12 +255,29 @@ onMounted(fetchAll)
               </span>
             </td>
             <td class="px-5 py-3 text-right">
-              <button
-                @click="openSubs(a)"
-                class="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-semibold"
-              >
-                <Eye class="w-4 h-4" /> View
-              </button>
+              <div class="inline-flex items-center gap-3">
+                <button
+                  @click="openSubs(a)"
+                  class="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-semibold"
+                  title="View submissions"
+                >
+                  <Eye class="w-4 h-4" /> View
+                </button>
+                <button
+                  @click="openEdit(a)"
+                  class="text-white/50 hover:text-white p-1 rounded hover:bg-white/5"
+                  title="Edit"
+                >
+                  <Pencil class="w-4 h-4" />
+                </button>
+                <button
+                  @click="deleteAssignment(a)"
+                  class="text-red-400/80 hover:text-red-400 p-1 rounded hover:bg-red-400/10"
+                  title="Delete"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
             </td>
           </tr>
           <tr v-if="!assignments.length">
@@ -299,16 +350,17 @@ onMounted(fetchAll)
       <div v-if="showCreate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="showCreate = false">
         <div class="w-full max-w-lg bg-[#1E1E1E] border border-white/10 rounded-2xl p-6">
           <div class="flex items-center justify-between mb-5">
-            <h2 class="text-lg font-extrabold text-white">New assignment</h2>
+            <h2 class="text-lg font-extrabold text-white">{{ editingId ? 'Edit assignment' : 'New assignment' }}</h2>
             <button @click="showCreate = false" class="text-white/40 hover:text-white"><X class="w-5 h-5" /></button>
           </div>
-          <form @submit.prevent="createAssignment" class="space-y-4">
+          <form @submit.prevent="saveAssignment" class="space-y-4">
             <p v-if="createError" class="rounded-xl bg-red-400/10 px-4 py-3 text-sm text-red-400">{{ createError }}</p>
             <div>
               <label class="block text-xs font-semibold text-white/60 mb-1.5">Session</label>
               <select
                 v-model.number="newAssignment.session_id"
-                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-white/10 focus:border-cyan-400 focus:outline-none"
+                :disabled="!!editingId"
+                class="w-full px-4 py-3 bg-[#2D2D2D] rounded-xl text-white text-sm border border-white/10 focus:border-cyan-400 focus:outline-none disabled:opacity-60"
               >
                 <option :value="0" class="bg-[#2D2D2D]">Select a session…</option>
                 <option v-for="s in sessions" :key="s.id" :value="s.id" class="bg-[#2D2D2D]">
@@ -316,6 +368,7 @@ onMounted(fetchAll)
                 </option>
               </select>
               <p v-if="!sessions.length" class="mt-1.5 text-xs text-white/40">No sessions available.</p>
+              <p v-if="editingId" class="mt-1.5 text-xs text-white/40">Session can't be changed after the assignment is created.</p>
             </div>
             <div>
               <label class="block text-xs font-semibold text-white/60 mb-1.5">Title</label>
@@ -337,7 +390,7 @@ onMounted(fetchAll)
               />
             </div>
             <button type="submit" :disabled="creating" class="w-full py-3 rounded-xl bg-cyan-400 text-[#121212] font-bold text-sm hover:bg-cyan-300 disabled:opacity-50 transition-colors">
-              {{ creating ? 'Creating…' : 'Create' }}
+              {{ creating ? (editingId ? 'Saving…' : 'Creating…') : (editingId ? 'Save changes' : 'Create') }}
             </button>
           </form>
         </div>

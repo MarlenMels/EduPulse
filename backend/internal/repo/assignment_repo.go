@@ -51,6 +51,14 @@ func (r *AssignmentRepo) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+func (r *AssignmentRepo) Update(ctx context.Context, id int64, title, description string) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE assignments SET title = $1, description = $2 WHERE id = $3",
+		title, description, id,
+	)
+	return err
+}
+
 // AssignmentRow extends an assignment with denormalized session/course/teacher fields
 // so list endpoints can render them without follow-up joins.
 type AssignmentRow struct {

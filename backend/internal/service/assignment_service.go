@@ -124,6 +124,57 @@ func (s *AssignmentService) GetByID(ctx context.Context, id int64) (*repo.Assign
 	return s.assignments.GetByID(ctx, id)
 }
 
+type UpdateAssignmentInput struct {
+	Title       string
+	Description string
+}
+
+func (s *AssignmentService) Update(ctx context.Context, actorID int64, role string, id int64, in UpdateAssignmentInput) (*repo.Assignment, error) {
+	a, err := s.assignments.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if a == nil {
+		return nil, errors.New("assignment not found")
+	}
+	if role == auth.RoleTeacher && a.CreatedBy != actorID {
+		// Teachers can also edit if they teach the course this assignment belongs to.
+		sess, err := s.sessions.GetByID(ctx, a.SessionID)
+		if err != nil {
+			return nil, err
+		}
+		if sess == nil {
+			return nil, errors.New("session not found")
+		}
+		isTeacher, err := s.teachers.IsTeacher(ctx, sess.CourseID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !isTeacher {
+			return nil, errors.New("you can only edit your own assignments or those in courses you teach")
+		}
+	}
+
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		return nil, errors.New("title is required")
+	}
+	if len(title) > 200 {
+		return nil, errors.New("title must be at most 200 characters")
+	}
+	description := strings.TrimSpace(in.Description)
+	if len(description) > 5000 {
+		return nil, errors.New("description must be at most 5000 characters")
+	}
+
+	if err := s.assignments.Update(ctx, id, title, description); err != nil {
+		return nil, err
+	}
+	_ = s.audit.Log(ctx, actorID, "update_assignment", "assignment", id, map[string]any{})
+	updated, _ := s.assignments.GetByID(ctx, id)
+	return updated, nil
+}
+
 func (s *AssignmentService) Delete(ctx context.Context, actorID int64, role string, id int64) error {
 	a, err := s.assignments.GetByID(ctx, id)
 	if err != nil {
@@ -133,7 +184,20 @@ func (s *AssignmentService) Delete(ctx context.Context, actorID int64, role stri
 		return errors.New("assignment not found")
 	}
 	if role == auth.RoleTeacher && a.CreatedBy != actorID {
-		return errors.New("you can only delete assignments you created")
+		sess, err := s.sessions.GetByID(ctx, a.SessionID)
+		if err != nil {
+			return err
+		}
+		if sess == nil {
+			return errors.New("session not found")
+		}
+		isTeacher, err := s.teachers.IsTeacher(ctx, sess.CourseID, actorID)
+		if err != nil {
+			return err
+		}
+		if !isTeacher {
+			return errors.New("you can only delete your own assignments or those in courses you teach")
+		}
 	}
 	if err := s.assignments.Delete(ctx, id); err != nil {
 		return err
