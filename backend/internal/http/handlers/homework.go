@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"edupulse/internal/middleware"
+	"edupulse/internal/repo"
 	"edupulse/internal/service"
 )
 
