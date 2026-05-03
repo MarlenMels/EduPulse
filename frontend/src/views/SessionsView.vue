@@ -81,15 +81,23 @@ async function createSession() {
   }
   creating.value = true
   try {
+    console.log('Creating session with data:', {
+      course_id: newSession.value.course_id,
+      title: newSession.value.title,
+      start_time: new Date(newSession.value.start_time).toISOString()
+    })
     await sessionsApi.create({
       course_id: newSession.value.course_id,
       title: newSession.value.title,
       start_time: new Date(newSession.value.start_time).toISOString(),
     })
+    console.log('Session created successfully')
     closeCreateModal()
     newSession.value = { title: '', start_time: '', course_id: null }
     await fetchSessions()
   } catch (e: any) {
+    console.error('Failed to create session:', e)
+    console.error('Error response:', e.response?.data)
     formError.value = e.response?.data?.error || 'Failed to create'
   } finally {
     creating.value = false
@@ -122,10 +130,14 @@ function formatDate(dateStr: string) {
 
 async function fetchCourses() {
   try {
+    console.log('Fetching courses...')
     const res = await coursesApi.list({ limit: 100 })
+    console.log('Courses response:', res.data)
     courses.value = res.data.items || []
+    console.log('Courses loaded:', courses.value.length)
   } catch (e: any) {
     console.error('Failed to load courses:', e)
+    console.error('Error response:', e.response?.data)
   }
 }
 
