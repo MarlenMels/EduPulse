@@ -129,6 +129,7 @@ func NewServer(d Deps) *Server {
 		r.Delete("/sessions/{id}", middleware.RBAC(auth.RoleAdmin, auth.RoleManager, auth.RoleTeacher)(http.HandlerFunc(sessionH.Delete)).ServeHTTP)
 
 		// Homework — student-side
+		r.Get("/homework", hwH.List)
 		r.Post("/homework/submit", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Submit)).ServeHTTP)
 		r.Get("/homework/mine", middleware.RBAC(auth.RoleAdmin, auth.RoleStudent)(http.HandlerFunc(hwH.Mine)).ServeHTTP)
 		r.Patch("/homework/{id}/status", middleware.RBAC(auth.RoleAdmin, auth.RoleTeacher, auth.RoleManager)(http.HandlerFunc(hwH.UpdateStatus)).ServeHTTP)
