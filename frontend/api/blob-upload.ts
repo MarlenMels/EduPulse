@@ -62,8 +62,10 @@ export default async function handler(request: any, response: any) {
 
     const body = (await readJsonBody(request)) as HandleUploadBody
     const isTokenRequest = body.type === 'blob.generate-client-token'
-    const claims = isTokenRequest ? verifyJwt(bearerToken(request)) : null
-    if (isTokenRequest && !claims) {
+    const claims = verifyJwt(bearerToken(request))
+    
+    // Always verify token for security
+    if (!claims) {
       return sendJson(response, 401, { error: 'unauthorized' })
     }
 
