@@ -32,10 +32,12 @@ onBeforeUnmount(() => { if (hls) { hls.destroy(); hls = null } })
 </script>
 
 <template>
-  <video
-    ref="videoEl"
-    :poster="poster"
-    controls
-    class="w-full aspect-video rounded-2xl bg-black"
-  />
+  <div class="max-w-2xl mx-auto">
+    <video
+      ref="videoEl"
+      :poster="poster"
+      controls
+      class="w-full aspect-video rounded-xl bg-black shadow-lg border border-white/10"
+    />
+  </div>
 </template>
